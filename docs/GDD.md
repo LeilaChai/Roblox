@@ -7,7 +7,7 @@
 | Platform | Roblox (PC / mobile / console, touch-adapted) |
 | Mode | Always solo-playable; multiplayer on shared servers (suggested 8–16 players) |
 | Camera | Third person |
-| Doc version | v0.2 (draft) |
+| Doc version | v0.3 (draft) |
 | Last updated | 2026-06-01 |
 
 ---
@@ -68,7 +68,7 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 Effective jump height stacks three layers:
 ```
 JumpHeight = BaseJump
-           × (1 + LegPowerBonus)      ← account-permanent, diminishing returns
+           × (1 + LegPowerBonus)      ← account-permanent, scales uncapped
            × (1 + ChargeBonus)        ← run-scoped, from looping zones
            × (1 + JumpUpgradeBonus)   ← optional, bought with Robux
            × ChargeFraction           ← 0..1 from how long you held space
@@ -88,19 +88,19 @@ JumpHeight = BaseJump
 - **`LegPower`** is a server-authoritative, **account-permanent** stat saved via DataStore. Every spacebar press increments it; it **never resets**. The longer a player plays, the thicker their legs.
 - LegPower drives:
   1. **Visual**: leg mesh/scale thickens by tier (`UpdateMuscle`).
-  2. **Jump ceiling**: higher LegPower → higher jumps, with **diminishing returns** (see curve) so growth never fully trivializes the game.
+  2. **Jump ceiling**: higher LegPower → higher jumps, scaling **continuously with no cap** — long-term players keep getting stronger.
   3. **Stomp resolution**: decides stomp outcome when other players are present (see 4.3).
   4. **Fall cost (the counter)**: thicker legs → faster fall acceleration and a **lower fall-damage threshold**. Big legs stay genuinely risky near death zones. *(Confirmed kept.)*
 
-| LegPower tier | Cumulative presses (approx) | Jump bonus (diminishing) | Fall accel | Visual leg girth |
+| LegPower tier | Cumulative presses (approx) | Jump bonus (no cap) | Fall accel | Visual leg girth |
 |---|---|---|---|---|
 | 1 | 0–250 | +0% | ×1.0 | 100% |
-| 2 | 250–1k | +20% | ×1.2 | 130% |
-| 3 | 1k–4k | +35% | ×1.5 | 170% |
-| 4 | 4k–15k | +47% | ×1.8 | 220% |
-| 5 | 15k+ | +55% (soft cap) | ×2.0 | 260% |
+| 2 | 250–1k | +25% | ×1.2 | 130% |
+| 3 | 1k–4k | +60% | ×1.5 | 170% |
+| 4 | 4k–15k | +120% | ×1.8 | 220% |
+| 5 | 15k+ | +200%, keeps scaling | ×2.0 | 260% |
 
-> **Anti-trivialization safeguards (all applied):** (1) jump-height bonus has **diminishing returns** toward a soft cap; (2) **higher zones require a minimum LegPower** to be passable, so the curve always has somewhere to go; (3) the **fall-risk counter** keeps big legs dangerous.
+> **Anti-trivialization safeguards:** (1) **higher zones require a minimum LegPower** to be passable, so there is always somewhere to grow into; (2) the **fall-risk counter** — thicker legs jump higher but fall faster and take more fall damage — keeps big legs genuinely dangerous near death zones.
 
 ### 4.3 Stomp & Double Jump — opportunistic PvP bonus
 
@@ -311,7 +311,7 @@ src/
 | Base jump height | 5.0 (lowered) |
 | Time to full charge | 0.8s |
 | Move-speed multiplier while charging | ×0.3 |
-| LegPower jump bonus | diminishing → soft cap +55% |
+| LegPower jump bonus | scales continuously, no cap |
 | Charge Bonus per loop / cap | +5% / +50% |
 | Double-jump height multiplier | ×0.8 |
 | Stomp invuln frame / stun | 0.3s / 0.5s |
@@ -330,7 +330,7 @@ src/
 - **Robux purchases**: premium Wings (stronger abilities), permanent jump-power upgrades.
 - **Game Passes**: cosmetic bundles, VIP perks (e.g. extra checkpoint, bonus coin rate).
 
-> 💡 **Suggested guardrail:** since Robux can buy permanent jump-power, whales will rank higher on the global height board. Consider a **separate non-paid "Pure" leaderboard** (no jump-upgrade contribution) so free players still have a fair competition, alongside the main board. — open for decision.
+> Robux can buy permanent jump-power, so paying players will rank higher on the global height board — this is intentional and accepted. No separate "free" leaderboard; one global board for everyone.
 
 ---
 
@@ -362,8 +362,7 @@ src/
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Client authority enables cheating | Permanent stats / leaderboards corrupted | Migrate to server authority + DataStore at M1; validate displacement/damage server-side |
-| Permanent LegPower trivializes levels | Game gets boring | Diminishing returns + zone LegPower gating + fall-risk counter |
-| Paid jump-power = pay-to-win on global board | Free players feel locked out | Separate non-paid "Pure" leaderboard (see §13) |
+| Permanent LegPower trivializes levels | Game gets boring | Zone LegPower gating + fall-risk counter (no jump-bonus cap by design) |
 | Veterans out-stomp newcomers (permanent LegPower) | New-player frustration | Stomp is secondary; optional current-run delta or LegPower-bracketed servers later |
 | Two currencies confuse players | Onboarding friction | Strict split: spacebar→LegPower, height→coins, loops→charge; clear HUD/tutorial |
 | Procedural tower dead ends | Stuck players | Standardized section interfaces + post-gen reachability check |
@@ -375,10 +374,9 @@ src/
 
 1. Premium wings: charge-consumable (Dev Product) or cooldown (Game Pass)? (Current plan: own wing + spend Glide Charges.)
 2. **More wing abilities to design at dev time** (see §4.6 reminder) — what's the full ability roster and pricing curve?
-3. Add the separate non-paid "Pure" height leaderboard (§13 guardrail)?
-4. Stomp fairness with permanent LegPower — leave as-is, current-run delta, or bracketed servers?
-5. Does the run-scoped Charge Bonus persist across death (within a session) or only while you don't leave? (Current: resets only on leaving the game.)
-6. Exact Leap Coins payout curve and what early-game temp boosts feel best.
+3. Stomp fairness with permanent LegPower — leave as-is, current-run delta, or bracketed servers?
+4. Does the run-scoped Charge Bonus persist across death (within a session) or only while you don't leave? (Current: resets only on leaving the game.)
+5. Exact Leap Coins payout curve and what early-game temp boosts feel best.
 
 ---
 
