@@ -1,340 +1,340 @@
-# Leap of Legends — 游戏设计文档 (GDD)
+# Leap of Legends — Game Design Document (GDD)
 
-| 项目 | 内容 |
+| Field | Detail |
 |---|---|
-| 游戏名 | Leap of Legends |
-| 类型 | 竞速攀爬 + 轻 PvP（Tower of Hell 风格 + 踩踏对抗） |
-| 平台 | Roblox（PC / 移动端 / 主机，触屏适配） |
-| 模式 | 多人同服回合制（建议单服 8–16 人） |
-| 视角 | 第三人称 |
-| 文档版本 | v0.1（草稿） |
-| 最后更新 | 2026-05-31 |
+| Title | Leap of Legends |
+| Genre | Vertical climb race + light PvP (Tower of Hell style + stomp combat) |
+| Platform | Roblox (PC / mobile / console, touch-adapted) |
+| Mode | Multiplayer single-server rounds (suggested 8–16 players per server) |
+| Camera | Third person |
+| Doc version | v0.1 (draft) |
+| Last updated | 2026-05-31 |
 
 ---
 
-## 1. 电梯演讲（One-liner）
+## 1. Elevator Pitch
 
-> 在一座随机生成、限时崩塌的高塔里，靠"按空格蓄力"决定你跳多高。跳得越多腿越粗——腿粗的人能把腿细的踩下塔，并借势二段跳冲向塔顶。第一个登顶的人赢，但每一次蓄力都让你更强、也更危险。
-
----
-
-## 2. 设计支柱（Design Pillars）
-
-1. **蓄力即风险（Charge is Risk）**——每次跳跃都让腿变粗、跳更高，但也让你下落更快、坠落伤害更高。玩家必须在"爬得快"和"爬得稳"之间做取舍。
-2. **腿粗者为王（Mass Matters）**——肌肉值不是纯装饰，它决定踩踏对抗的胜负。强者能踩弱者并获得二段跳，制造逆转与攻击性玩法。
-3. **易学难精（Easy to Learn, Hard to Master）**——一个按键（空格）就能玩；但蓄力时机、踩踏落点、躲避死亡区需要大量练习。
-4. **每局都是新塔（Always a New Tower）**——程序化拼接关卡，保证可重复性与传播性（适合短视频/直播）。
+> Inside a randomly generated, time-limited tower, "hold space to charge" decides how high you jump. The more you jump, the thicker your legs get — and thick-legged players can stomp thin-legged ones off the tower, then ride the stomp into a double jump toward the summit. First to the top wins, but every charge makes you stronger *and* more fragile.
 
 ---
 
-## 3. 核心循环（Core Loop）
+## 2. Design Pillars
+
+1. **Charge is Risk** — Every jump makes your legs thicker and your jump higher, but it also makes you fall faster and take more fall damage. Players constantly trade "climb fast" against "climb safe."
+2. **Mass Matters** — Muscle isn't just cosmetic; it decides who wins a stomp. The stronger player can stomp the weaker one and gain a double jump, enabling comebacks and aggressive play.
+3. **Easy to Learn, Hard to Master** — One key (space) to play; but charge timing, stomp landing, and dodging death zones take real practice.
+4. **Always a New Tower** — Procedurally assembled levels guarantee replayability and shareability (great for short-form video / streaming).
+
+---
+
+## 3. Core Loop
 
 ```
-进入回合 → 在塔底生成
+Enter round → spawn at tower base
    ↓
-蓄力跳跃向上爬（每跳：腿变粗 + 跳更高 + 下落更快）
+Charge-jump upward (each jump: legs thicker + jump higher + fall faster)
    ↓
-遇到其他玩家 → 从上方踩踏 → 比腿粗
-   ├─ 我更粗：对方被踩下，我获得二段跳，借势冲高
-   └─ 我更细：我被弹开 / 反被踩下
+Meet another player → stomp from above → compare leg thickness
+   ├─ I'm thicker: they get stomped down, I gain a double jump, ride it higher
+   └─ I'm thinner: I bounce off / get stomped down instead
    ↓
-碰到死亡区 / 坠落过高 → 受伤或回到检查点
+Touch a death zone / fall too far → take damage or return to checkpoint
    ↓
-登顶 or 计时结束 → 结算 → 发奖励 → 新塔重开
+Reach summit or timer ends → results → rewards → new tower restarts
 ```
 
-单局时长目标：**5–8 分钟**。
+Target round length: **5–8 minutes**.
 
 ---
 
-## 4. 核心机制详解
+## 4. Core Mechanics in Detail
 
-### 4.1 蓄力跳跃（Charged Jump）— 已有雏形
+### 4.1 Charged Jump — prototype exists
 
-**现状**（`src/character/JumpHeightWMuscleGrowthWFallingSpeed.client.luau`）：
-- 每次跳跃 `numPressed += 1`，触发 `UpdateJumpHeight` / `UpdateMuscle` / `StartFalling`。
-- `MAX_JUMPS = 1`，`TIME_BETWEEN_JUMPS = 0.2`，落地后 `numJUMPS` 归零。
+**Current** (`src/character/JumpHeightWMuscleGrowthWFallingSpeed.client.luau`):
+- Each jump does `numPressed += 1`, firing `UpdateJumpHeight` / `UpdateMuscle` / `StartFalling`.
+- `MAX_JUMPS = 1`, `TIME_BETWEEN_JUMPS = 0.2`, `numJUMPS` resets on landing.
 
-**目标设计**：
-- 玩家**按住空格蓄力，松手起跳**。蓄力时长（0 → 满）映射到跳跃高度。
-- 也保留"连点累积"读法：连续成功跳跃让 `numPressed` 上升，腿越来越粗、单跳上限越来越高。
-- 蓄力期间角色有可见的"下蹲 + 腿部膨胀"预备动作，给对手判断信息。
+**Target design**:
+- Player **holds space to charge, releases to jump**. Charge duration (0 → full) maps to jump height.
+- Also keep the "accumulation" reading: consecutive successful jumps raise `numPressed`, making legs thicker and the single-jump ceiling higher over time.
+- During charge the character shows a visible "crouch + leg swell" wind-up, giving opponents read-able information.
 
-| 参数 | 初始值 | 说明 |
+| Parameter | Initial value | Notes |
 |---|---|---|
-| 基础跳跃高度 | 7.2（Roblox 默认） | 未蓄力的最小跳 |
-| 满蓄力高度倍率 | ×3.5 | 满蓄力跳跃高度 |
-| 满蓄力所需时间 | 0.8s | 按住空格到满 |
-| 蓄力期间移速 | ×0.3 | 蓄力时减速，制造取舍 |
+| Base jump height | 7.2 (Roblox default) | Uncharged minimum jump |
+| Full-charge height multiplier | ×3.5 | Jump height at full charge |
+| Time to full charge | 0.8s | Hold space to max |
+| Move speed while charging | ×0.3 | Slowed while charging, creates a tradeoff |
 
-### 4.2 腿部肌肉 / 力量值（Leg Power）— 已有雏形
+### 4.2 Leg Muscle / Leg Power — prototype exists
 
-**现状**：`UpdateMuscle:FireServer(numPressed)` 已布线，但服务端逻辑为空。
+**Current**: `UpdateMuscle:FireServer(numPressed)` is wired, but server logic is empty.
 
-**目标设计**：
-- 定义角色属性 **`LegPower`**（服务器权威，存为 Humanoid 的 Attribute）。
-- `LegPower` 随累计跳跃次数增长，并驱动：
-  1. **视觉**：腿部网格/缩放随等级变粗（`UpdateMuscle`）。
-  2. **跳跃上限**：腿越粗，单次满蓄力能跳得越高。
-  3. **踩踏判定**：决定踩踏对抗胜负（见 4.3）。
-  4. **下落代价**：腿越粗，下落加速越快、坠落伤害阈值越低（继承 `StartFalling` 逻辑）——这是 `LegPower` 的天然反制。
+**Target design**:
+- Define a character stat **`LegPower`** (server-authoritative, stored as a Humanoid Attribute).
+- `LegPower` grows with cumulative jump count and drives:
+  1. **Visual**: leg mesh/scale thickens by tier (`UpdateMuscle`).
+  2. **Jump ceiling**: thicker legs → higher possible full-charge jump.
+  3. **Stomp resolution**: decides stomp combat outcome (see 4.3).
+  4. **Fall cost**: thicker legs → faster fall acceleration and a lower fall-damage threshold (inherits `StartFalling` logic) — this is `LegPower`'s natural counter.
 
-| LegPower 等级 | 累计跳跃次数 | 跳跃倍率加成 | 下落加速 | 视觉腿围 |
+| LegPower tier | Cumulative jumps | Jump multiplier bonus | Fall acceleration | Visual leg girth |
 |---|---|---|---|---|
 | 1 | 0–4 | +0% | ×1.0 | 100% |
 | 2 | 5–11 | +15% | ×1.2 | 130% |
 | 3 | 12–24 | +35% | ×1.5 | 170% |
 | 4 | 25+ | +60% | ×2.0 | 220% |
 
-> **平衡核心**：腿粗 = 跳更高 + 踩踏更强，但 = 落得更快、更容易被死亡区/坠落伤害惩罚。强势与脆弱绑定，避免滚雪球。
+> **Balance core**: thick legs = jump higher + stomp harder, but = fall faster and get punished more easily by death zones / fall damage. Strength and fragility are bound together to avoid snowballing.
 
-### 4.3 踩踏 & 二段跳（Stomp & Double Jump）— **新核心机制**
+### 4.3 Stomp & Double Jump — **new core mechanic**
 
-这是本作区别于普通 Tower of Hell 的灵魂玩法。
+This is the soul mechanic that sets the game apart from a plain Tower of Hell.
 
-**触发条件**：
-- 玩家 A 从**上方**落到玩家 B 的头部碰撞盒（A 的脚部 / 速度向下）。
-- 由**服务器**比较 `A.LegPower` 与 `B.LegPower`。
+**Trigger conditions**:
+- Player A lands on player B's head hitbox **from above** (A's feet / downward velocity).
+- The **server** compares `A.LegPower` vs `B.LegPower`.
 
-**判定结果**：
+**Resolution**:
 
-| 情况 | 对 A（踩踏方） | 对 B（被踩方） |
+| Case | For A (stomper) | For B (stomped) |
 |---|---|---|
-| A.LegPower > B.LegPower | 立即获得**一次二段跳**（可在空中再起跳一次），并获得一个向上小弹跳 | 被向下击退（损失高度），短暂硬直 0.5s |
-| A.LegPower = B.LegPower | 双方弹开（无人得利） | 双方弹开 |
-| A.LegPower < B.LegPower | 被向上/侧向弹开，无二段跳 | 不受影响，可视为"反弹垫" |
+| A.LegPower > B.LegPower | Immediately gains **one double jump** (can jump again mid-air) + a small upward bounce | Knocked downward (loses height), 0.5s stun |
+| A.LegPower = B.LegPower | Both bounce apart (nobody benefits) | Both bounce apart |
+| A.LegPower < B.LegPower | Bounced up/sideways, no double jump | Unaffected; acts as a "bounce pad" |
 
-**二段跳细节**：
-- 正常 `MAX_JUMPS = 1`；踩踏成功后临时 `MAX_JUMPS += 1`（落地后清除）。
-- 二段跳高度 = 当前蓄力高度 ×0.8，鼓励"踩人→借势冲高"的连段。
-- 设计意图：把"踩人"从单纯的骚扰变成**进攻性位移工具**——强者主动找弱者踩，作为加速登顶的手段。
+**Double jump details**:
+- Normally `MAX_JUMPS = 1`; a successful stomp temporarily sets `MAX_JUMPS += 1` (cleared on landing).
+- Double-jump height = current charged height ×0.8, encouraging "stomp → ride higher" combos.
+- Design intent: turn "stomping" from pure griefing into an **offensive mobility tool** — strong players actively seek out weaker ones to stomp as a way to accelerate to the top.
 
-**反制与公平性**：
-- 被踩方有 0.3s 无敌帧防连踩。
-- 死亡区附近踩人风险极高（踩完落点没控好自己也会掉），高风险高回报。
-- `LegPower` **每回合重置**，防止跨局碾压。
+**Counterplay & fairness**:
+- The stomped player gets 0.3s of invulnerability to prevent stomp-locking.
+- Stomping near a death zone is extremely risky (botch your own landing and you fall too) — high risk, high reward.
+- `LegPower` **resets every round**, preventing cross-round dominance.
 
-### 4.4 坠落与坠落伤害（Falling & Fall Damage）— 已有雏形
+### 4.4 Falling & Fall Damage — prototype exists
 
-**现状**：下落距离 `>= 600` 触发 `FallDamage:FireServer()`；`StartFalling/StopFalling` 已布线。
+**Current**: a fall distance `>= 600` triggers `FallDamage:FireServer()`; `StartFalling/StopFalling` are wired.
 
-**目标设计**：
-- 坠落伤害阈值随 `LegPower` 降低（腿越粗摔得越狠）。
-- 伤害 = 超出阈值部分 × 系数，可致死（归零血量 → 回检查点）。
-- `StartFalling(numPressed)` 用于根据腿粗增加下落加速度，强化"重量感"。
+**Target design**:
+- The fall-damage threshold lowers as `LegPower` rises (thicker legs fall harder).
+- Damage = (amount over threshold) × coefficient, can be lethal (health to zero → return to checkpoint).
+- `StartFalling(numPressed)` increases fall acceleration based on leg thickness, reinforcing the sense of "weight."
 
-### 4.5 死亡区域 & 重生（Death Zone & Respawn）— 已有雏形
+### 4.5 Death Zone & Respawn — prototype exists
 
-**现状**：`DeadZone` 脚本——碰到该部件 `Humanoid.Health = 0`。
+**Current**: the `DeadZone` script sets `Humanoid.Health = 0` on touch.
 
-**目标设计**：
-- 死亡区 = 塔底虚空 / 岩浆 / 旋转刀片等障碍表面。
-- 死亡后**回到最近检查点**（非 Tower of Hell 经典的"回到塔底"，因为加入 PvP 后全程重来过于惩罚）。
-- 检查点：每隔 N 个区段一个安全平台，踩到即记录。
-- 可做一个"软核/硬核"开关：硬核模式取消检查点，给硬核玩家挑战。
+**Target design**:
+- Death zones = the void at the tower base / lava / spinning blades and other hazard surfaces.
+- On death, **return to the nearest checkpoint** (not the classic Tower of Hell "back to the base," since with PvP added a full restart is too punishing).
+- Checkpoints: a safe platform every N sections; touching one records it.
+- Optional "casual/hardcore" toggle: hardcore mode removes checkpoints for players who want the challenge.
 
-### 4.6 飞行能力（Press to Fly）— 取舍
+### 4.6 Press to Fly — to be decided
 
-**现状**：`PressToFly` 脚本存在，按空格飞、飞行时间随蓄力累积。
+**Current**: the `PressToFly` script exists; hold space to fly, fly time accumulates with charge.
 
-**决策**：在本玩法中，**飞行与"蓄力跳"按键冲突**（都用空格），且无限飞会破坏攀爬挑战。建议二选一：
-- **方案 A（推荐）**：移除常驻飞行，改为**稀有道具/技能**——塔上拾取"羽毛"获得 3 秒限时滑翔，用于救场。
-- **方案 B**：作为付费/解锁的特殊角色被动，单独平衡。
-
----
-
-## 5. 关卡设计：程序化高塔（Procedural Tower）
-
-- 塔由若干预制 **区段（Section）** 自下而上随机拼接，每段是一个独立的 Roblox Model，带标准化的进出接口（底部入口 + 顶部出口对齐）。
-- 区段库按难度分级（Easy / Medium / Hard / Insane），随高度递增加权抽取。
-- 每个区段包含：跳跃间隙、移动平台、死亡区障碍、可选检查点。
-- 塔总高目标：**150–250 个区段** / 约 5–8 分钟可达顶（高手）。
-- 区段用 Tag（CollectionService）标记类型，生成器在服务器运行，结果复制给所有客户端，保证同服同塔。
-
-**生成器输入**：随机种子（每回合一个，写入排行榜便于复现/比赛）。
+**Decision**: in this design, **flight conflicts with the charged-jump key** (both use space), and unlimited flight breaks the climbing challenge. Recommend choosing one:
+- **Option A (recommended)**: remove persistent flight; replace with a **rare item/ability** — pick up a "feather" on the tower for 3s of timed glide, used to save yourself.
+- **Option B**: as a paid/unlockable special-character passive, balanced separately.
 
 ---
 
-## 6. 回合结构 & 胜利条件
+## 5. Level Design: Procedural Tower
 
-| 阶段 | 时长 | 说明 |
+- The tower is assembled bottom-to-top from prefabricated **Sections**. Each section is an independent Roblox Model with a standardized entry/exit interface (bottom entry aligned to top exit).
+- The section library is graded by difficulty (Easy / Medium / Hard / Insane), weighted toward harder picks as height increases.
+- Each section contains: jump gaps, moving platforms, death-zone hazards, optional checkpoints.
+- Target tower height: **150–250 sections** / roughly 5–8 minutes to summit (for skilled players).
+- Sections are tagged with CollectionService; the generator runs on the server and replicates the result to all clients, guaranteeing the same tower on the same server.
+
+**Generator input**: a random seed (one per round, written to the leaderboard for reproducibility / competitive play).
+
+---
+
+## 6. Round Structure & Win Condition
+
+| Phase | Duration | Notes |
 |---|---|---|
-| 准备 | 10s | 生成新塔、玩家集合到塔底、展示种子 |
-| 攀爬 | 6 min（上限） | 主玩法 |
-| 收尾 | 首位登顶后 30s | 给其余玩家冲刺 |
-| 结算 | 10s | 排名、发奖、展示数据 |
+| Prep | 10s | Generate new tower, gather players at base, show the seed |
+| Climb | 6 min (cap) | Main gameplay |
+| Finish | 30s after first summit | Lets remaining players sprint |
+| Results | 10s | Ranking, rewards, stats display |
 
-**胜利 / 排名**：
-- 第一名 = **最先登顶**；若无人登顶，则按**最高到达高度**排名。
-- 附加榜：踩踏次数、最大单跳高度、零死亡通关等成就榜。
-
----
-
-## 7. 进度与元游戏（Meta Progression）
-
-回合内 `LegPower` 重置，但跨回合有永久成长：
-
-- **货币**：登顶/排名/踩踏获得「Leap Coins」。
-- **解锁**：
-  - 外观皮肤（腿部样式、起跳特效、踩踏特效）。
-  - 起跳/落地音效。
-  - 角色 Trail。
-- **等级系统**：累计游玩经验提升账号等级，解锁挑战模式。
-- **每日任务**：如"踩 5 个玩家""零死亡爬 50 段"，提升留存。
-
-> 永久成长**只给外观与挑战内容，不给数值优势**，保证竞速公平（避免 P2W 破坏排行榜公信力）。
+**Win / ranking**:
+- 1st place = **first to summit**; if nobody summits, rank by **highest height reached**.
+- Side boards: stomp count, biggest single jump, no-death clears and other achievement boards.
 
 ---
 
-## 8. 多人 & 网络架构
+## 7. Progression & Meta
 
-> **关键**：当前原型是**客户端权威**（客户端直接改 `humanoid.Health`、本地判定跳跃）。加入 PvP 踩踏后，必须迁移到**服务器权威**，否则极易被作弊（瞬移登顶、伪造 LegPower、无敌）。
+`LegPower` resets within a round, but there is permanent cross-round growth:
 
-**服务器负责（权威）**：
-- 维护每个玩家的 `LegPower`、位置校验、高度记录。
-- 踩踏判定（比较 LegPower、施加击退、授予二段跳）。
-- 死亡 / 重生 / 检查点。
-- 塔生成、回合状态机、排行榜。
-- 反作弊：移速/位移上限校验、坠落伤害服务器复算。
+- **Currency**: earn "Leap Coins" from summiting / ranking / stomping.
+- **Unlocks**:
+  - Cosmetic skins (leg styles, jump-launch effects, stomp effects).
+  - Jump/land sound effects.
+  - Character trails.
+- **Level system**: cumulative play XP raises account level, unlocking challenge modes.
+- **Daily quests**: e.g. "stomp 5 players," "climb 50 sections with no deaths," to boost retention.
 
-**客户端负责**：
-- 输入采集（蓄力、跳跃、移动）。
-- 表现层（动画、特效、UI、预测）。
-- 把意图（起跳、蓄力值）上报服务器，由服务器确认。
+> Permanent growth grants **cosmetics and challenge content only, never stat advantages**, keeping the race fair (avoid P2W undermining leaderboard credibility).
 
 ---
 
-## 9. 技术实现映射
+## 8. Multiplayer & Networking
 
-### 现有 RemoteEvent（复用）
+> **Critical**: the current prototype is **client-authoritative** (the client directly sets `humanoid.Health`, judges jumps locally). Once PvP stomping is added, it must migrate to **server-authoritative**, or cheating becomes trivial (teleport to summit, fake LegPower, invulnerability).
 
-| Remote | 现状 | 在新设计中的角色 |
+**Server responsibilities (authoritative)**:
+- Maintain each player's `LegPower`, validate positions, record height.
+- Stomp resolution (compare LegPower, apply knockback, grant double jump).
+- Death / respawn / checkpoints.
+- Tower generation, round state machine, leaderboard.
+- Anti-cheat: validate move-speed/displacement caps, recompute fall damage server-side.
+
+**Client responsibilities**:
+- Input capture (charge, jump, move).
+- Presentation (animation, effects, UI, prediction).
+- Report intent (jump, charge value) to the server for confirmation.
+
+---
+
+## 9. Technical Implementation Mapping
+
+### Existing RemoteEvents (reuse)
+
+| Remote | Current | Role in new design |
 |---|---|---|
-| `UpdateJumpHeight` | 已布线 | 客户端上报蓄力跳意图 → 服务器确认跳跃高度 |
-| `UpdateMuscle` | 已布线 | 服务器据 `LegPower` 下发腿围视觉更新 |
-| `StartFalling` / `StopFalling` | 已布线 | 控制下落加速、坠落计时 |
-| `FallDamage` | 已布线 | 改为**服务器复算**坠落伤害，客户端仅触发 |
+| `UpdateJumpHeight` | wired | Client reports charged-jump intent → server confirms jump height |
+| `UpdateMuscle` | wired | Server pushes leg-girth visual updates based on `LegPower` |
+| `StartFalling` / `StopFalling` | wired | Control fall acceleration and fall timing |
+| `FallDamage` | wired | Change to **server-recomputed** fall damage; client only triggers |
 
-### 需新增
+### To add
 
-| 名称 | 类型 | 作用 |
+| Name | Type | Purpose |
 |---|---|---|
-| `StompResolved` | RemoteEvent (S→C) | 通知踩踏结果（谁被踩、二段跳授予、特效） |
-| `GrantDoubleJump` | RemoteEvent (S→C) | 服务器授予临时二段跳额度 |
-| `TowerGenerated` | RemoteEvent (S→C) | 下发本回合塔种子/结构 |
-| `RoundState` | RemoteEvent (S→C) | 同步回合阶段与倒计时 |
-| `CheckpointReached` | RemoteEvent (C→S→C) | 记录/确认检查点 |
-| `RequestJump` | RemoteEvent (C→S) | 上报蓄力跳意图（服务器校验） |
+| `StompResolved` | RemoteEvent (S→C) | Notify stomp result (who got stomped, double-jump grant, effects) |
+| `GrantDoubleJump` | RemoteEvent (S→C) | Server grants temporary double-jump allowance |
+| `TowerGenerated` | RemoteEvent (S→C) | Push the round's tower seed/structure |
+| `RoundState` | RemoteEvent (S→C) | Sync round phase and countdown |
+| `CheckpointReached` | RemoteEvent (C→S→C) | Record/confirm checkpoints |
+| `RequestJump` | RemoteEvent (C→S) | Report charged-jump intent (server validates) |
 
-### 建议模块结构（Rojo 映射）
+### Suggested module structure (Rojo mapping)
 
 ```
 src/
-  server/        → ServerScriptService（服务器权威逻辑）
+  server/        → ServerScriptService (server-authoritative logic)
     TowerGenerator/
     RoundManager/
     StompResolver/
     LegPowerService/
     AntiCheat/
-  client/        → StarterPlayerScripts（输入与表现）
-  character/     → StarterCharacterScripts（角色挂载脚本）
-  shared/        → ReplicatedStorage（共享配置、Remote 定义、常量表）
-    Config/      → 所有数值常量集中管理（便于平衡调参）
-    Remotes/     → RemoteEvent 定义
+  client/        → StarterPlayerScripts (input & presentation)
+  character/     → StarterCharacterScripts (character-mounted scripts)
+  shared/        → ReplicatedStorage (shared config, Remote definitions, constants)
+    Config/      → all numeric constants centralized (easy balance tuning)
+    Remotes/     → RemoteEvent definitions
 ```
 
 ---
 
 ## 10. UI / UX
 
-- **蓄力条**：角色脚下/头顶显示蓄力进度环，松手即跳。
-- **LegPower 指示**：自身腿围 + HUD 上一个等级图标；他人头顶显示其 LegPower 等级，便于决策"能不能踩"。
-- **高度 / 排名 HUD**：当前高度、当前名次、距第一名差距。
-- **回合计时器**：顶部倒计时。
-- **踩踏反馈**：成功踩踏时屏幕震动 + "STOMP!" 飘字 + 二段跳提示。
-- **移动端**：跳跃/蓄力按钮（长按蓄力），复用现有 `TouchGui` 适配逻辑。
+- **Charge bar**: a charge progress ring under/above the character; release to jump.
+- **LegPower indicator**: your own leg girth + a tier icon on the HUD; other players show their LegPower tier above their head, to inform the "can I stomp them?" decision.
+- **Height / rank HUD**: current height, current rank, gap to 1st place.
+- **Round timer**: countdown at the top.
+- **Stomp feedback**: on a successful stomp, screen shake + "STOMP!" pop text + double-jump prompt.
+- **Mobile**: jump/charge button (long-press to charge), reusing the existing `TouchGui` adaptation logic.
 
 ---
 
-## 11. 美术 & 音频方向
+## 11. Art & Audio Direction
 
-- **风格**：明快、卡通、略夸张的"肌肉感"——腿越粗越滑稽夸张，强化记忆点与传播性。
-- **角色**：标准 Roblox 角色 + 可替换的腿部肌肉网格分级。
-- **塔**：主题分层（草地 → 工业 → 天空 → 太空），随高度切换 Skybox 与配色。
-- **音频**：蓄力"充能"音、起跳"嘭"、踩踏"咚 + 滑稽弹簧音"、坠落风声、登顶号角。
+- **Style**: bright, cartoonish, slightly exaggerated "muscle" feel — the thicker the legs the more comically exaggerated, reinforcing memorability and shareability.
+- **Character**: standard Roblox avatar + swappable tiered leg-muscle meshes.
+- **Tower**: themed layers (grassland → industrial → sky → space), switching Skybox and palette with height.
+- **Audio**: charge "power-up" sound, jump "thump," stomp "boom + comedic spring," fall wind, summit fanfare.
 
 ---
 
-## 12. 数值与平衡（初始调参表）
+## 12. Numbers & Balance (initial tuning table)
 
-> 全部常量集中放 `src/shared/Config/`，便于热调。以下为起始建议值，需实测迭代。
+> Keep all constants centralized in `src/shared/Config/` for hot tuning. The values below are starting suggestions and need playtest iteration.
 
-| 参数 | 值 |
+| Parameter | Value |
 |---|---|
-| 满蓄力时间 | 0.8s |
-| 基础跳跃高度 | 7.2 |
-| 满蓄力高度倍率 | ×3.5 |
-| 蓄力期移速倍率 | ×0.3 |
-| 二段跳高度倍率 | ×0.8 |
-| 踩踏无敌帧 | 0.3s |
-| 被踩硬直 | 0.5s |
-| 坠落伤害阈值（LegPower 1） | 600 |
-| 坠落伤害阈值（LegPower 4） | 300 |
-| 单回合攀爬上限时长 | 6 min |
-| 检查点间隔 | 每 10 区段 |
+| Time to full charge | 0.8s |
+| Base jump height | 7.2 |
+| Full-charge height multiplier | ×3.5 |
+| Move-speed multiplier while charging | ×0.3 |
+| Double-jump height multiplier | ×0.8 |
+| Stomp invuln frame | 0.3s |
+| Stomped stun | 0.5s |
+| Fall-damage threshold (LegPower 1) | 600 |
+| Fall-damage threshold (LegPower 4) | 300 |
+| Single-round climb time cap | 6 min |
+| Checkpoint interval | every 10 sections |
 
 ---
 
-## 13. 变现（Monetization，Roblox）
+## 13. Monetization (Roblox)
 
-- **Game Pass**：额外外观槽、专属起跳特效、硬核模式入场。
-- **Developer Products**：复活到检查点（限量/计时）、皮肤抽取、双倍 Leap Coins（限时）。
-- **原则**：**绝不卖数值/跳跃力/踩踏胜率**，只卖外观与便利。保护竞速公平与社区信任。
+- **Game Passes**: extra cosmetic slots, exclusive jump-launch effects, hardcore-mode entry.
+- **Developer Products**: revive at checkpoint (limited/timed), skin rolls, double Leap Coins (timed).
+- **Principle**: **never sell stats / jump power / stomp win-rate**, only cosmetics and convenience. Protects race fairness and community trust.
 
 ---
 
-## 14. MVP 范围 & 里程碑路线图
+## 14. MVP Scope & Milestone Roadmap
 
-### MVP（可玩验证核心乐趣）
-- [ ] 蓄力跳跃（服务器确认）
-- [ ] LegPower 成长 + 腿围视觉
-- [ ] 踩踏判定 + 二段跳（**核心差异点，优先验证**）
-- [ ] 死亡区 + 检查点重生
-- [ ] 手动搭建 1 座固定测试塔（先不做程序生成）
-- [ ] 基础回合循环 + 登顶判定
+### MVP (prove the core fun)
+- [ ] Charged jump (server-confirmed)
+- [ ] LegPower growth + leg-girth visual
+- [ ] Stomp resolution + double jump (**core differentiator, validate first**)
+- [ ] Death zone + checkpoint respawn
+- [ ] One hand-built fixed test tower (skip procedural generation for now)
+- [ ] Basic round loop + summit detection
 
-### 里程碑
+### Milestones
 
-| 阶段 | 目标 |
+| Phase | Goal |
 |---|---|
-| M1 验证 | MVP：固定塔 + 踩踏二段跳跑通，内部测试"踩人冲高"是否好玩 |
-| M2 内容 | 程序化塔生成、区段库、检查点、回合制 |
-| M3 留存 | 元进度、皮肤、每日任务、排行榜 |
-| M4 打磨 | 反作弊加固、移动端适配、美术/音频、性能优化 |
-| M5 上线 | 变现、首发活动、数据埋点与迭代 |
+| M1 Validate | MVP: fixed tower + stomp/double-jump running, internally test whether "stomp to climb" is fun |
+| M2 Content | Procedural tower generation, section library, checkpoints, round system |
+| M3 Retention | Meta progression, skins, daily quests, leaderboards |
+| M4 Polish | Anti-cheat hardening, mobile adaptation, art/audio, performance optimization |
+| M5 Launch | Monetization, launch event, telemetry and iteration |
 
 ---
 
-## 15. 风险与对策
+## 15. Risks & Mitigations
 
-| 风险 | 影响 | 对策 |
+| Risk | Impact | Mitigation |
 |---|---|---|
-| 客户端权威导致作弊 | PvP 排行榜失去公信力 | M1 即迁移服务器权威，位移/伤害服务器校验 |
-| 踩踏滚雪球（强者恒强） | 弱者体验差、流失 | LegPower 每局重置 + 腿粗=摔得狠的反制 + 无敌帧 |
-| 蓄力与飞行按键冲突 | 操作混乱 | 飞行降级为限时道具（见 4.6） |
-| 程序化塔出现死路/不可通过 | 卡关 | 区段标准化接口 + 生成后可达性校验 |
-| 移动端蓄力手感差 | 移动用户流失 | 长按蓄力 + 触屏专属调参，早期实测 |
+| Client authority enables cheating | PvP leaderboard loses credibility | Migrate to server authority at M1; validate displacement/damage server-side |
+| Stomp snowball (rich-get-richer) | Weak players have a bad time, churn | LegPower resets each round + thick-legs-fall-harder counter + invuln frames |
+| Charge vs fly key conflict | Confusing controls | Downgrade flight to a timed item (see 4.6) |
+| Procedural tower produces dead ends / impassable gaps | Stuck players | Standardized section interfaces + post-generation reachability check |
+| Poor mobile charge feel | Mobile users churn | Long-press charge + touch-specific tuning, playtest early |
 
 ---
 
-## 16. 待定问题（Open Questions）
+## 16. Open Questions
 
-1. 检查点：软核（有检查点）还是保留 Tower of Hell 经典硬核（掉落回底）？或双模式？
-2. 踩踏胜负用"严格大于"还是"大于等于也算赢"？影响同等级对抗手感。
-3. 单服人数上限定多少（8 / 16 / 24）？影响踩踏密度与服务器负载。
-4. 飞行最终去留（道具 / 角色被动 / 完全移除）？
-5. 登顶后是继续观战还是进入下一塔预热？
+1. Checkpoints: casual (with checkpoints) or keep classic Tower of Hell hardcore (fall → back to base)? Or both modes?
+2. Stomp outcome: use "strictly greater" or does "equal also wins"? Affects same-tier combat feel.
+3. Per-server player cap (8 / 16 / 24)? Affects stomp density and server load.
+4. Final fate of flight (item / character passive / removed entirely)?
+5. After summiting, spectate or move into next-tower warm-up?
 
 ---
 
-*本文档为 v0.1 草稿，待 M1 原型实测后迭代数值与机制。*
+*This document is a v0.1 draft, to be iterated on numbers and mechanics after the M1 prototype playtest.*
