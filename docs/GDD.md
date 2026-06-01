@@ -3,47 +3,52 @@
 | Field | Detail |
 |---|---|
 | Title | Leap of Legends |
-| Genre | Vertical climb race + light PvP (Tower of Hell style + stomp combat) |
+| Genre | Endless vertical climber + idle/growth progression + optional PvP stomp |
 | Platform | Roblox (PC / mobile / console, touch-adapted) |
-| Mode | Multiplayer single-server rounds (suggested 8–16 players per server) |
+| Mode | Always solo-playable; multiplayer on shared servers (suggested 8–16 players) |
 | Camera | Third person |
-| Doc version | v0.1 (draft) |
-| Last updated | 2026-05-31 |
+| Doc version | v0.2 (draft) |
+| Last updated | 2026-06-01 |
 
 ---
 
 ## 1. Elevator Pitch
 
-> Inside a randomly generated, time-limited tower, "hold space to charge" decides how high you jump. The more you jump, the thicker your legs get — and thick-legged players can stomp thin-legged ones off the tower, then ride the stomp into a double jump toward the summit. First to the top wins, but every charge makes you stronger *and* more fragile.
+> Hold space to charge, release to jump. Every press permanently thickens your legs, so the more you play the higher you can leap. Climb a procedurally generated, never-ending tower — loop back through a zone to stack temporary charge bonuses and push higher than anyone else. There is no finish line: your score is how high you climb, shown against every other player. Earn coins by climbing, buy wings to save yourself mid-fall, and watch your legs grow legendary.
 
 ---
 
 ## 2. Design Pillars
 
-1. **Charge is Risk** — Every jump makes your legs thicker and your jump higher, but it also makes you fall faster and take more fall damage. Players constantly trade "climb fast" against "climb safe."
-2. **Mass Matters** — Muscle isn't just cosmetic; it decides who wins a stomp. The stronger player can stomp the weaker one and gain a double jump, enabling comebacks and aggressive play.
-3. **Easy to Learn, Hard to Master** — One key (space) to play; but charge timing, stomp landing, and dodging death zones take real practice.
-4. **Always a New Tower** — Procedurally assembled levels guarantee replayability and shareability (great for short-form video / streaming).
+1. **Every Press Counts, Forever** — Each spacebar press grows account-permanent LegPower. Players feel themselves getting stronger across every session.
+2. **Charge is Risk** — Thicker legs jump higher but fall faster and take more fall damage. Power and fragility are bound together, especially near death zones.
+3. **Climb, Loop, Climb Higher** — Looping back through a cleared zone resets it and grants a run-scoped charge bonus, turning a few procedural zones into an endless, replayable ascent.
+4. **Easy to Learn, Hard to Master** — One key (space) to play; charge timing, precise landings, and dodging death zones take real practice.
 
 ---
 
 ## 3. Core Loop
 
 ```
-Enter round → spawn at tower base
+Enter game (solo or shared server) → spawn at the base with low starting jump
    ↓
-Charge-jump upward (each jump: legs thicker + jump higher + fall faster)
+Charge-jump upward (each press: +LegPower permanently; thicker legs = higher jump + faster fall)
    ↓
-Meet another player → stomp from above → compare leg thickness
-   ├─ I'm thicker: they get stomped down, I gain a double jump, ride it higher
-   └─ I'm thinner: I bounce off / get stomped down instead
+Gain new max height → earn Leap Coins (money) for new height only
    ↓
-Touch a death zone / fall too far → take damage or return to checkpoint
+Reach a zone's top gate → optionally LOOP BACK to its start
+   └─ Zone resets + grants a run-scoped Charge Bonus → climb even higher this run
    ↓
-Reach summit or timer ends → results → rewards → new tower restarts
+(If others share the server) stomp weaker-legged players from above → double jump
+   ↓
+Touch a death zone / fall too far → respawn at last checkpoint (run continues, nothing lost)
+   ↓
+Spend Leap Coins (temp boosts, basic wings) / Robux (premium wings, jump upgrades, glide charges)
+   ↓
+Push for a new personal-best height, compare against the global leaderboard
 ```
 
-Target round length: **5–8 minutes**.
+There is **no win condition** — the goal is maximum height. Sessions are open-ended.
 
 ---
 
@@ -57,150 +62,170 @@ Target round length: **5–8 minutes**.
 
 **Target design**:
 - Player **holds space to charge, releases to jump**. Charge duration (0 → full) maps to jump height.
-- Also keep the "accumulation" reading: consecutive successful jumps raise `numPressed`, making legs thicker and the single-jump ceiling higher over time.
-- During charge the character shows a visible "crouch + leg swell" wind-up, giving opponents read-able information.
+- **Starting jump is deliberately low** — players earn reach through LegPower (permanent), Charge Bonus (run-scoped loops), and optional Robux jump-power upgrades.
+- During charge the character shows a visible "crouch + leg swell" wind-up.
+
+Effective jump height stacks three layers:
+```
+JumpHeight = BaseJump
+           × (1 + LegPowerBonus)      ← account-permanent, diminishing returns
+           × (1 + ChargeBonus)        ← run-scoped, from looping zones
+           × (1 + JumpUpgradeBonus)   ← optional, bought with Robux
+           × ChargeFraction           ← 0..1 from how long you held space
+```
 
 | Parameter | Initial value | Notes |
 |---|---|---|
-| Base jump height | 7.2 (Roblox default) | Uncharged minimum jump |
-| Full-charge height multiplier | ×3.5 | Jump height at full charge |
+| Base jump height | 5.0 (lowered from 7.2 default) | Weak on purpose; you grow into power |
 | Time to full charge | 0.8s | Hold space to max |
 | Move speed while charging | ×0.3 | Slowed while charging, creates a tradeoff |
 
-### 4.2 Leg Muscle / Leg Power — prototype exists
+### 4.2 LegPower (Leg Muscle) — prototype exists, now account-permanent
 
 **Current**: `UpdateMuscle:FireServer(numPressed)` is wired, but server logic is empty.
 
 **Target design**:
-- Define a character stat **`LegPower`** (server-authoritative, stored as a Humanoid Attribute).
-- `LegPower` grows with cumulative jump count and drives:
+- **`LegPower`** is a server-authoritative, **account-permanent** stat saved via DataStore. Every spacebar press increments it; it **never resets**. The longer a player plays, the thicker their legs.
+- LegPower drives:
   1. **Visual**: leg mesh/scale thickens by tier (`UpdateMuscle`).
-  2. **Jump ceiling**: thicker legs → higher possible full-charge jump.
-  3. **Stomp resolution**: decides stomp combat outcome (see 4.3).
-  4. **Fall cost**: thicker legs → faster fall acceleration and a lower fall-damage threshold (inherits `StartFalling` logic) — this is `LegPower`'s natural counter.
+  2. **Jump ceiling**: higher LegPower → higher jumps, with **diminishing returns** (see curve) so growth never fully trivializes the game.
+  3. **Stomp resolution**: decides stomp outcome when other players are present (see 4.3).
+  4. **Fall cost (the counter)**: thicker legs → faster fall acceleration and a **lower fall-damage threshold**. Big legs stay genuinely risky near death zones. *(Confirmed kept.)*
 
-| LegPower tier | Cumulative jumps | Jump multiplier bonus | Fall acceleration | Visual leg girth |
+| LegPower tier | Cumulative presses (approx) | Jump bonus (diminishing) | Fall accel | Visual leg girth |
 |---|---|---|---|---|
-| 1 | 0–4 | +0% | ×1.0 | 100% |
-| 2 | 5–11 | +15% | ×1.2 | 130% |
-| 3 | 12–24 | +35% | ×1.5 | 170% |
-| 4 | 25+ | +60% | ×2.0 | 220% |
+| 1 | 0–250 | +0% | ×1.0 | 100% |
+| 2 | 250–1k | +20% | ×1.2 | 130% |
+| 3 | 1k–4k | +35% | ×1.5 | 170% |
+| 4 | 4k–15k | +47% | ×1.8 | 220% |
+| 5 | 15k+ | +55% (soft cap) | ×2.0 | 260% |
 
-> **Balance core**: thick legs = jump higher + stomp harder, but = fall faster and get punished more easily by death zones / fall damage. Strength and fragility are bound together to avoid snowballing.
+> **Anti-trivialization safeguards (all applied):** (1) jump-height bonus has **diminishing returns** toward a soft cap; (2) **higher zones require a minimum LegPower** to be passable, so the curve always has somewhere to go; (3) the **fall-risk counter** keeps big legs dangerous.
 
-### 4.3 Stomp & Double Jump — **new core mechanic**
+### 4.3 Stomp & Double Jump — opportunistic PvP bonus
 
-This is the soul mechanic that sets the game apart from a plain Tower of Hell.
+When other players share the server, stomping adds a competitive layer. With solo play it simply never triggers.
 
-**Trigger conditions**:
-- Player A lands on player B's head hitbox **from above** (A's feet / downward velocity).
-- The **server** compares `A.LegPower` vs `B.LegPower`.
-
-**Resolution**:
+**Trigger**: Player A lands on player B's head hitbox **from above**. The **server** compares `A.LegPower` vs `B.LegPower`.
 
 | Case | For A (stomper) | For B (stomped) |
 |---|---|---|
-| A.LegPower > B.LegPower | Immediately gains **one double jump** (can jump again mid-air) + a small upward bounce | Knocked downward (loses height), 0.5s stun |
-| A.LegPower = B.LegPower | Both bounce apart (nobody benefits) | Both bounce apart |
-| A.LegPower < B.LegPower | Bounced up/sideways, no double jump | Unaffected; acts as a "bounce pad" |
+| A.LegPower > B.LegPower | Gains **one double jump** + a small upward bounce | Knocked downward, 0.5s stun |
+| A.LegPower = B.LegPower | Both bounce apart | Both bounce apart |
+| A.LegPower < B.LegPower | Bounced up/sideways, no double jump | Acts as a "bounce pad" |
 
-**Double jump details**:
-- Normally `MAX_JUMPS = 1`; a successful stomp temporarily sets `MAX_JUMPS += 1` (cleared on landing).
-- Double-jump height = current charged height ×0.8, encouraging "stomp → ride higher" combos.
-- Design intent: turn "stomping" from pure griefing into an **offensive mobility tool** — strong players actively seek out weaker ones to stomp as a way to accelerate to the top.
+**Double jump**: normally `MAX_JUMPS = 1`; a stomp temporarily grants `+1` (cleared on landing). Double-jump height = current charged height ×0.8 → "stomp to climb higher" combos.
 
-**Counterplay & fairness**:
-- The stomped player gets 0.3s of invulnerability to prevent stomp-locking.
-- Stomping near a death zone is extremely risky (botch your own landing and you fall too) — high risk, high reward.
-- `LegPower` **resets every round**, preventing cross-round dominance.
+**Fairness notes**: stomped player gets 0.3s invuln (no stomp-locking); stomping near death zones is high-risk. ⚠️ Because LegPower is now account-permanent, veterans will out-stomp newcomers — acceptable since stomp is **secondary content**, but flagged in Risks for later (e.g., optional current-run delta or LegPower-bracketed servers).
 
 ### 4.4 Falling & Fall Damage — prototype exists
 
 **Current**: a fall distance `>= 600` triggers `FallDamage:FireServer()`; `StartFalling/StopFalling` are wired.
 
 **Target design**:
-- The fall-damage threshold lowers as `LegPower` rises (thicker legs fall harder).
-- Damage = (amount over threshold) × coefficient, can be lethal (health to zero → return to checkpoint).
-- `StartFalling(numPressed)` increases fall acceleration based on leg thickness, reinforcing the sense of "weight."
+- Fall-damage threshold **lowers as LegPower rises** (thicker legs fall harder) — this is the core counter to permanent growth.
+- Damage = (amount over threshold) × coefficient; can be lethal → respawn at checkpoint.
+- `StartFalling(numPressed)` increases fall acceleration based on leg thickness for a weighty feel.
 
 ### 4.5 Death Zone & Respawn — prototype exists
 
 **Current**: the `DeadZone` script sets `Humanoid.Health = 0` on touch.
 
 **Target design**:
-- Death zones = the void at the tower base / lava / spinning blades and other hazard surfaces.
-- On death, **return to the nearest checkpoint** (not the classic Tower of Hell "back to the base," since with PvP added a full restart is too punishing).
-- Checkpoints: a safe platform every N sections; touching one records it.
-- Optional "casual/hardcore" toggle: hardcore mode removes checkpoints for players who want the challenge.
+- Death zones = the void below, lava gaps, spinning blades, swinging hammers, etc.
+- On death, **respawn at the nearest checkpoint** — the run continues and nothing is permanently lost (LegPower, coins, and max height are all banked).
+- Checkpoints: a safe platform every N sections.
 
-### 4.6 Press to Fly — to be decided
+### 4.6 Wings (replaces Flight) — paid glide/ability system
 
-**Current**: the `PressToFly` script exists; hold space to fly, fly time accumulates with charge.
+Persistent flight is removed (it conflicted with the charge-jump key and trivialized climbing). It is replaced by **Wings**: an equippable item that grants a save-yourself ability, activated mid-fall by spending a **Glide Charge**.
 
-**Decision**: in this design, **flight conflicts with the charged-jump key** (both use space), and unlimited flight breaks the climbing challenge. Recommend choosing one:
-- **Option A (recommended)**: remove persistent flight; replace with a **rare item/ability** — pick up a "feather" on the tower for 3s of timed glide, used to save yourself.
-- **Option B**: as a paid/unlockable special-character passive, balanced separately.
+**Two-part model:**
+- **Wing type** = the visual + ability. Owned permanently. Basic tiers buyable with **Leap Coins**; premium tiers (stronger abilities) buyable with **Robux**. Better ability = higher price.
+- **Glide Charge** = consumable fuel. Each activation spends 1 charge. Bought as a **Robux Developer Product** (the chosen monetization model). Rare free charge pickups may appear in levels.
+
+**Wing ability tiers (initial):**
+
+| Tier | Wing | Ability | Acquire |
+|---|---|---|---|
+| 1 | Basic Feather | 3s slow descent (save yourself) | Leap Coins |
+| 2 | (TBD) | Longer slow descent (e.g. 5–6s) | Leap Coins / Robux |
+| 3 | (TBD) | Ability to **fly up** for a short burst | Robux |
+
+> 📝 **Reminder for development:** when we start building Wings, brainstorm more ability types beyond "slow descent" and "fly up" (e.g. horizontal dash, hover, anti-knockback, brief death-zone immunity). Pricing scales with power. — *Leila to revisit at implementation time.*
+
+⚠️ **Detail to confirm at dev time:** whether premium wings are activation-charge-based (Dev Product) or cooldown-based (Game Pass). Current plan = own the wing + spend Glide Charges.
 
 ---
 
-## 5. Level Design: Procedural Tower
+## 5. Level Design: Procedural Endless Tower
 
-- The tower is assembled bottom-to-top from prefabricated **Sections**. Each section is an independent Roblox Model with a standardized entry/exit interface (bottom entry aligned to top exit).
-- The section library is graded by difficulty (Easy / Medium / Hard / Insane), weighted toward harder picks as height increases.
-- Each section contains: jump gaps, moving platforms, death-zone hazards, optional checkpoints.
-- Target tower height: **150–250 sections** / roughly 5–8 minutes to summit (for skilled players).
-- Sections are tagged with CollectionService; the generator runs on the server and replicates the result to all clients, guaranteeing the same tower on the same server.
+- The tower is an endless stack of standardized **Sections** (Roblox Models) with aligned entry/exit interfaces, weighted harder with height.
+- **Section archetypes**: variable-width gap jumps, moving platforms, crumbling platforms, death-zone hazards (lava gaps, spinning blades, swinging hammers), bounce pads (free height), wind zones (where Wings shine), narrow precision ledges, and **optional high-LegPower side routes**.
+- **Themed zones by height** (each gated by a minimum LegPower): Grassland → Caverns → Industrial → Sky → Space, switching skybox/palette/gravity. Zone gating is what keeps the permanent-growth curve meaningful.
+- Sections tagged via CollectionService; the generator runs **server-side** and replicates so everyone on a server sees the same tower.
+- **Generator input**: a per-server random seed (logged for reproducibility / leaderboards).
 
-**Generator input**: a random seed (one per round, written to the leaderboard for reproducibility / competitive play).
+### 5.1 Loop-and-Prestige (the "go back to start" reward)
+
+- On reaching a zone's **top gate**, the player unlocks the option to **loop back** to that zone's start.
+- Looping **resets/regenerates the zone** and grants a **run-scoped Charge Bonus** — slightly more charge per press, so jumps go higher *this run*. **This is NOT permanent jump power.**
+- Charge Bonus is additive per loop and stacks up to a cap; it **resets when the player leaves the game**, keeping the loop active every session.
+- Design payoff: a handful of procedural zones become endlessly replayable, players self-pace their power spikes, and we need far fewer hand-authored levels.
+
+| Loop parameter | Initial value |
+|---|---|
+| Charge Bonus per loop | +5% charge |
+| Charge Bonus cap | +50% (10 loops) |
+| Persistence | Run-scoped (resets on leaving the game) |
+
+### 5.2 Height Comparison
+
+- **Live server leaderboard**: current height of everyone on the server.
+- **Global all-time leaderboard**: highest height ever reached (per account).
+- **Ghost height markers**: faint banners on the tower marking where top players / friends reached — motivation + shareable screenshots.
 
 ---
 
-## 6. Round Structure & Win Condition
+## 6. Session Structure (No Win Condition)
 
-| Phase | Duration | Notes |
+- Open-ended: a player keeps climbing until they choose to leave.
+- **Score = max height reached.** Persisted per account; surfaced on leaderboards.
+- Death never ends a session — it respawns at a checkpoint.
+- Side boards: most loops in one run, biggest single jump, stomp count, fastest to a height milestone.
+
+---
+
+## 7. Progression & Economy
+
+Two clean growth tracks (no overlap):
+
+| Source | Grants | Scope |
 |---|---|---|
-| Prep | 10s | Generate new tower, gather players at base, show the seed |
-| Climb | 6 min (cap) | Main gameplay |
-| Finish | 30s after first summit | Lets remaining players sprint |
-| Results | 10s | Ranking, rewards, stats display |
+| **Spacebar press** | **LegPower** | Account-permanent (DataStore) |
+| **New max height climbed** | **Leap Coins** (money) | Account-permanent (DataStore) |
+| **Looping a zone** | **Charge Bonus** | Run-scoped |
 
-**Win / ranking**:
-- 1st place = **first to summit**; if nobody summits, rank by **highest height reached**.
-- Side boards: stomp count, biggest single jump, no-death clears and other achievement boards.
+**Leap Coins** are earned for **new height only** (climbing above your run's previous max), preventing up/down farming.
 
----
+**Currency sinks:**
 
-## 7. Progression & Meta
+| Currency | Buys |
+|---|---|
+| **Leap Coins** (earned by climbing) | Temporary boosts (e.g. 2× coins, 2× charge, brief speed); basic Wings |
+| **Robux** (real money) | Premium Wings (stronger abilities); **permanent jump-power upgrades**; Glide Charges (consumable) |
 
-`LegPower` resets within a round, but there is permanent cross-round growth:
-
-- **Currency**: earn "Leap Coins" from summiting / ranking / stomping.
-- **Unlocks**:
-  - Cosmetic skins (leg styles, jump-launch effects, stomp effects).
-  - Jump/land sound effects.
-  - Character trails.
-- **Level system**: cumulative play XP raises account level, unlocking challenge modes.
-- **Daily quests**: e.g. "stomp 5 players," "climb 50 sections with no deaths," to boost retention.
-
-> Permanent growth grants **cosmetics and challenge content only, never stat advantages**, keeping the race fair (avoid P2W undermining leaderboard credibility).
+> Players who want to progress faster buy Robux to purchase high-tier wings and jump-power upgrades. Everything is reachable through play; Robux accelerates and adds flair.
 
 ---
 
 ## 8. Multiplayer & Networking
 
-> **Critical**: the current prototype is **client-authoritative** (the client directly sets `humanoid.Health`, judges jumps locally). Once PvP stomping is added, it must migrate to **server-authoritative**, or cheating becomes trivial (teleport to summit, fake LegPower, invulnerability).
+> **Critical**: the current prototype is **client-authoritative** (client sets `humanoid.Health`, judges jumps locally). This must migrate to **server-authoritative**, both for PvP stomping and to protect the account-permanent LegPower / coins / leaderboards from exploits.
 
-**Server responsibilities (authoritative)**:
-- Maintain each player's `LegPower`, validate positions, record height.
-- Stomp resolution (compare LegPower, apply knockback, grant double jump).
-- Death / respawn / checkpoints.
-- Tower generation, round state machine, leaderboard.
-- Anti-cheat: validate move-speed/displacement caps, recompute fall damage server-side.
+**Server (authoritative)**: LegPower, Leap Coins, max height, jump-power upgrade level, owned wings, glide charges — all validated and persisted via DataStore. Also: stomp resolution, death/respawn/checkpoints, tower generation, loop/prestige grants, anti-cheat (displacement/speed caps, server-recomputed fall damage), leaderboards, Robux purchases via MarketplaceService.
 
-**Client responsibilities**:
-- Input capture (charge, jump, move).
-- Presentation (animation, effects, UI, prediction).
-- Report intent (jump, charge value) to the server for confirmation.
+**Client**: input capture, presentation/prediction, reporting intent (charge value, jump, wing activation) for server confirmation.
 
 ---
 
@@ -208,110 +233,127 @@ This is the soul mechanic that sets the game apart from a plain Tower of Hell.
 
 ### Existing RemoteEvents (reuse)
 
-| Remote | Current | Role in new design |
+| Remote | Current | Role |
 |---|---|---|
-| `UpdateJumpHeight` | wired | Client reports charged-jump intent → server confirms jump height |
-| `UpdateMuscle` | wired | Server pushes leg-girth visual updates based on `LegPower` |
-| `StartFalling` / `StopFalling` | wired | Control fall acceleration and fall timing |
-| `FallDamage` | wired | Change to **server-recomputed** fall damage; client only triggers |
+| `UpdateJumpHeight` | wired | Client reports charged-jump intent → server confirms height |
+| `UpdateMuscle` | wired | Server pushes leg-girth visual from LegPower |
+| `StartFalling` / `StopFalling` | wired | Fall acceleration & timing |
+| `FallDamage` | wired | **Server-recomputed** fall damage; client only triggers |
 
 ### To add
 
 | Name | Type | Purpose |
 |---|---|---|
-| `StompResolved` | RemoteEvent (S→C) | Notify stomp result (who got stomped, double-jump grant, effects) |
-| `GrantDoubleJump` | RemoteEvent (S→C) | Server grants temporary double-jump allowance |
-| `TowerGenerated` | RemoteEvent (S→C) | Push the round's tower seed/structure |
-| `RoundState` | RemoteEvent (S→C) | Sync round phase and countdown |
-| `CheckpointReached` | RemoteEvent (C→S→C) | Record/confirm checkpoints |
-| `RequestJump` | RemoteEvent (C→S) | Report charged-jump intent (server validates) |
+| `RequestJump` | C→S | Report charged-jump intent (server validates) |
+| `HeightUpdate` | C→S→C | Report/confirm new max height, award Leap Coins |
+| `CurrencyUpdate` | S→C | Push Leap Coins balance |
+| `LoopPrestige` | C→S→C | Trigger zone loop, grant run-scoped Charge Bonus |
+| `ActivateWing` | C→S | Request wing glide (server checks charges/ownership) |
+| `WingState` | S→C | Glide start/stop, charge count, effects |
+| `StompResolved` | S→C | Stomp result + double-jump grant + effects |
+| `GrantDoubleJump` | S→C | Temporary double-jump allowance |
+| `TowerGenerated` | S→C | Push tower seed/structure |
+| `CheckpointReached` | C→S→C | Record/confirm checkpoints |
+
+Robux purchases (premium wings, jump-power upgrades, glide charges) go through **MarketplaceService** (Game Passes + Developer Products), not RemoteEvents.
 
 ### Suggested module structure (Rojo mapping)
 
 ```
 src/
-  server/        → ServerScriptService (server-authoritative logic)
+  server/        → ServerScriptService (authoritative)
     TowerGenerator/
-    RoundManager/
+    SessionManager/
     StompResolver/
-    LegPowerService/
+    LegPowerService/      ← persists LegPower
+    EconomyService/       ← Leap Coins, height payouts
+    WingService/          ← ownership, glide charges, activation
+    PurchaseService/      ← MarketplaceService handling
+    DataStore/            ← profile save/load
     AntiCheat/
   client/        → StarterPlayerScripts (input & presentation)
-  character/     → StarterCharacterScripts (character-mounted scripts)
-  shared/        → ReplicatedStorage (shared config, Remote definitions, constants)
-    Config/      → all numeric constants centralized (easy balance tuning)
-    Remotes/     → RemoteEvent definitions
+  character/     → StarterCharacterScripts (character-mounted)
+  shared/        → ReplicatedStorage
+    Config/      ← all numeric constants (balance tuning)
+    Remotes/     ← RemoteEvent definitions
 ```
 
 ---
 
 ## 10. UI / UX
 
-- **Charge bar**: a charge progress ring under/above the character; release to jump.
-- **LegPower indicator**: your own leg girth + a tier icon on the HUD; other players show their LegPower tier above their head, to inform the "can I stomp them?" decision.
-- **Height / rank HUD**: current height, current rank, gap to 1st place.
-- **Round timer**: countdown at the top.
-- **Stomp feedback**: on a successful stomp, screen shake + "STOMP!" pop text + double-jump prompt.
-- **Mobile**: jump/charge button (long-press to charge), reusing the existing `TouchGui` adaptation logic.
+- **Charge bar** under/above the character; release to jump.
+- **LegPower indicator**: own leg girth + tier icon; other players show their tier above their head (stomp decision).
+- **Height & rank HUD**: current height, personal best, gap to nearest ghost / leaderboard rank.
+- **Currency HUD**: Leap Coins balance, +coins popups on new height.
+- **Wings widget**: equipped wing, remaining glide charges, activation button (mobile long-press friendly).
+- **Stomp feedback**: screen shake + "STOMP!" pop + double-jump prompt.
+- **Mobile**: charge/jump button reusing the existing `TouchGui` adaptation logic.
 
 ---
 
 ## 11. Art & Audio Direction
 
-- **Style**: bright, cartoonish, slightly exaggerated "muscle" feel — the thicker the legs the more comically exaggerated, reinforcing memorability and shareability.
+- **Style**: bright, cartoonish, exaggerated "muscle" — thicker legs look comically powerful, reinforcing memorability/shareability.
 - **Character**: standard Roblox avatar + swappable tiered leg-muscle meshes.
-- **Tower**: themed layers (grassland → industrial → sky → space), switching Skybox and palette with height.
-- **Audio**: charge "power-up" sound, jump "thump," stomp "boom + comedic spring," fall wind, summit fanfare.
+- **Wings**: distinct visuals per tier (feather → larger feathered wings → mechanical/energy wings), telegraphing ability strength.
+- **Tower**: themed zones (grassland → caverns → industrial → sky → space) shifting skybox/palette.
+- **Audio**: charge "power-up," jump "thump," stomp "boom + comedic spring," wing "whoosh," fall wind, height-milestone chime.
 
 ---
 
 ## 12. Numbers & Balance (initial tuning table)
 
-> Keep all constants centralized in `src/shared/Config/` for hot tuning. The values below are starting suggestions and need playtest iteration.
+> All constants centralized in `src/shared/Config/` for hot tuning. Starting suggestions — iterate via playtest.
 
 | Parameter | Value |
 |---|---|
+| Base jump height | 5.0 (lowered) |
 | Time to full charge | 0.8s |
-| Base jump height | 7.2 |
-| Full-charge height multiplier | ×3.5 |
 | Move-speed multiplier while charging | ×0.3 |
+| LegPower jump bonus | diminishing → soft cap +55% |
+| Charge Bonus per loop / cap | +5% / +50% |
 | Double-jump height multiplier | ×0.8 |
-| Stomp invuln frame | 0.3s |
-| Stomped stun | 0.5s |
-| Fall-damage threshold (LegPower 1) | 600 |
-| Fall-damage threshold (LegPower 4) | 300 |
-| Single-round climb time cap | 6 min |
+| Stomp invuln frame / stun | 0.3s / 0.5s |
+| Fall-damage threshold (LegPower 1 → 5) | 600 → 280 |
+| Leap Coins per new stud of height | 1 (tune) |
+| Basic Feather glide duration | 3s |
 | Checkpoint interval | every 10 sections |
 
 ---
 
 ## 13. Monetization (Roblox)
 
-- **Game Passes**: extra cosmetic slots, exclusive jump-launch effects, hardcore-mode entry.
-- **Developer Products**: revive at checkpoint (limited/timed), skin rolls, double Leap Coins (timed).
-- **Principle**: **never sell stats / jump power / stomp win-rate**, only cosmetics and convenience. Protects race fairness and community trust.
+**Revised principle:** This is an endless, solo-focused climber, so paid items may include **cosmetics, safety/convenience (wings, glide charges), and acceleration (jump-power upgrades)**. The one guardrail: keep a fair comparison space.
+
+- **Robux Developer Products**: Glide Charges (consumable), Leap Coin packs, temporary boost bundles.
+- **Robux purchases**: premium Wings (stronger abilities), permanent jump-power upgrades.
+- **Game Passes**: cosmetic bundles, VIP perks (e.g. extra checkpoint, bonus coin rate).
+
+> 💡 **Suggested guardrail:** since Robux can buy permanent jump-power, whales will rank higher on the global height board. Consider a **separate non-paid "Pure" leaderboard** (no jump-upgrade contribution) so free players still have a fair competition, alongside the main board. — open for decision.
 
 ---
 
 ## 14. MVP Scope & Milestone Roadmap
 
 ### MVP (prove the core fun)
-- [ ] Charged jump (server-confirmed)
-- [ ] LegPower growth + leg-girth visual
-- [ ] Stomp resolution + double jump (**core differentiator, validate first**)
+- [ ] Charged jump (server-confirmed) with **low base jump**
+- [ ] LegPower growth + leg-girth visual, **persisted via DataStore**
+- [ ] Height tracking → Leap Coins payout (new-height-only)
+- [ ] Loop-and-prestige Charge Bonus on a single test zone
 - [ ] Death zone + checkpoint respawn
-- [ ] One hand-built fixed test tower (skip procedural generation for now)
-- [ ] Basic round loop + summit detection
+- [ ] One hand-built fixed test tower (skip full procedural gen for now)
+- [ ] Basic Feather wing (3s glide) + Glide Charge consumption (stub purchase)
 
 ### Milestones
 
 | Phase | Goal |
 |---|---|
-| M1 Validate | MVP: fixed tower + stomp/double-jump running, internally test whether "stomp to climb" is fun |
-| M2 Content | Procedural tower generation, section library, checkpoints, round system |
-| M3 Retention | Meta progression, skins, daily quests, leaderboards |
-| M4 Polish | Anti-cheat hardening, mobile adaptation, art/audio, performance optimization |
-| M5 Launch | Monetization, launch event, telemetry and iteration |
+| M1 Validate | MVP: low-jump + LegPower growth + loop charge bonus running; test whether "press, grow, loop higher" is fun solo |
+| M2 Content | Procedural tower, section library, themed zones, zone LegPower gating, checkpoints |
+| M3 Economy & Wings | Leap Coins sinks, wing tiers, Glide Charges, temp boosts, MarketplaceService |
+| M4 Social & Retention | Leaderboards, ghost markers, daily quests, stomp PvP polish |
+| M5 Launch | Robux monetization, jump-power upgrades, launch event, telemetry & iteration |
 
 ---
 
@@ -319,22 +361,25 @@ src/
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Client authority enables cheating | PvP leaderboard loses credibility | Migrate to server authority at M1; validate displacement/damage server-side |
-| Stomp snowball (rich-get-richer) | Weak players have a bad time, churn | LegPower resets each round + thick-legs-fall-harder counter + invuln frames |
-| Charge vs fly key conflict | Confusing controls | Downgrade flight to a timed item (see 4.6) |
-| Procedural tower produces dead ends / impassable gaps | Stuck players | Standardized section interfaces + post-generation reachability check |
-| Poor mobile charge feel | Mobile users churn | Long-press charge + touch-specific tuning, playtest early |
+| Client authority enables cheating | Permanent stats / leaderboards corrupted | Migrate to server authority + DataStore at M1; validate displacement/damage server-side |
+| Permanent LegPower trivializes levels | Game gets boring | Diminishing returns + zone LegPower gating + fall-risk counter |
+| Paid jump-power = pay-to-win on global board | Free players feel locked out | Separate non-paid "Pure" leaderboard (see §13) |
+| Veterans out-stomp newcomers (permanent LegPower) | New-player frustration | Stomp is secondary; optional current-run delta or LegPower-bracketed servers later |
+| Two currencies confuse players | Onboarding friction | Strict split: spacebar→LegPower, height→coins, loops→charge; clear HUD/tutorial |
+| Procedural tower dead ends | Stuck players | Standardized section interfaces + post-gen reachability check |
+| Poor mobile charge feel | Mobile churn | Long-press charge + touch-specific tuning, playtest early |
 
 ---
 
 ## 16. Open Questions
 
-1. Checkpoints: casual (with checkpoints) or keep classic Tower of Hell hardcore (fall → back to base)? Or both modes?
-2. Stomp outcome: use "strictly greater" or does "equal also wins"? Affects same-tier combat feel.
-3. Per-server player cap (8 / 16 / 24)? Affects stomp density and server load.
-4. Final fate of flight (item / character passive / removed entirely)?
-5. After summiting, spectate or move into next-tower warm-up?
+1. Premium wings: charge-consumable (Dev Product) or cooldown (Game Pass)? (Current plan: own wing + spend Glide Charges.)
+2. **More wing abilities to design at dev time** (see §4.6 reminder) — what's the full ability roster and pricing curve?
+3. Add the separate non-paid "Pure" height leaderboard (§13 guardrail)?
+4. Stomp fairness with permanent LegPower — leave as-is, current-run delta, or bracketed servers?
+5. Does the run-scoped Charge Bonus persist across death (within a session) or only while you don't leave? (Current: resets only on leaving the game.)
+6. Exact Leap Coins payout curve and what early-game temp boosts feel best.
 
 ---
 
-*This document is a v0.1 draft, to be iterated on numbers and mechanics after the M1 prototype playtest.*
+*This document is a v0.2 draft (endless-climber pivot), to be iterated on numbers and mechanics after the M1 prototype playtest.*
