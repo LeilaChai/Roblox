@@ -14,25 +14,28 @@
 
 ## 1. Elevator Pitch
 
-> Hold space to charge, release to jump. Every press permanently thickens your legs, so the more you play the higher you can leap. Climb a procedurally generated, never-ending tower — loop back through a zone to stack temporary charge bonuses and push higher than anyone else. There is no finish line: your score is how high you climb, shown against every other player. Earn coins by climbing, buy wings to save yourself mid-fall, and watch your legs grow legendary.
+> Hold space to keep jumping — but you only have so many seconds of jump time before you fall, so manage it well. Every press permanently thickens your legs, so the more you play the higher you can leap. Climb a procedurally generated, never-ending tower — loop back through a zone to stack temporary charge bonuses and push higher than anyone else. There is no finish line: your score is how high you climb, shown against every other player. Earn coins by climbing, buy wings to save yourself mid-fall, and watch your legs grow legendary.
 
 ---
 
 ## 2. Design Pillars
 
 1. **Every Press Counts, Forever** — Each spacebar press grows account-permanent LegPower. Players feel themselves getting stronger across every session.
-2. **Charge is Risk** — Thicker legs jump higher but fall faster and take more fall damage. Power and fragility are bound together, especially near death zones.
-3. **Climb, Loop, Climb Higher** — Looping back through a cleared zone resets it and grants a run-scoped charge bonus, turning a few procedural zones into an endless, replayable ascent.
-4. **Easy to Learn, Hard to Master** — One key (space) to play; charge timing, precise landings, and dodging death zones take real practice.
+2. **Power is Risk** — Thicker legs jump higher but fall faster and take more fall damage. Power and fragility are bound together, especially near death zones.
+3. **Manage Your Jump Time** — Holding Space jumps continuously but burns a limited jump-time meter; run out and you fall. Knowing when to bounce and when to land to recharge is the core skill.
+4. **Climb, Loop, Climb Higher** — Looping back through a cleared zone resets it and grants a run-scoped charge bonus, turning a few procedural zones into an endless, replayable ascent.
+5. **Easy to Learn, Hard to Master** — One key (space) to play; jump-time management, precise landings, and dodging death zones take real practice.
 
 ---
 
 ## 3. Core Loop
 
 ```
-Enter game (solo or shared server) → spawn at the base with low starting jump
+Enter game (solo or shared server) → spawn at the base
    ↓
-Charge-jump upward (each press: +LegPower permanently; thicker legs = higher jump + faster fall)
+Hold Space to keep jumping up (burns jump time; each hop: +LegPower permanently; thicker legs = higher hop + faster fall) → land to recharge jump time
+   ↓
+Run out of jump time mid-air → fall automatically until you land
    ↓
 Gain new max height → earn Leap Coins (money) for new height only
    ↓
@@ -54,31 +57,27 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 
 ## 4. Core Mechanics in Detail
 
-### 4.1 Charged Jump — prototype exists
+### 4.1 Continuous Jump (hold to keep jumping) — implemented (M1)
 
-**Current** (`src/character/JumpHeightWMuscleGrowthWFallingSpeed.client.luau`):
-- Each jump does `numPressed += 1`, firing `UpdateJumpHeight` / `UpdateMuscle` / `StartFalling`.
-- `MAX_JUMPS = 1`, `TIME_BETWEEN_JUMPS = 0.2`, `numJUMPS` resets on landing.
+**Design** (replaces the earlier hold-to-charge model, which felt too slow):
+- **Tap or hold Space and the character keeps jumping** — no charge wind-up, instant and responsive. While Space is held it auto-hops at the top of each arc.
+- A **Jump-Time meter** (in seconds) drains while you are jumping. When it hits zero you **fall automatically**, and must **land to recharge** it. The on-screen bar shows the remaining jump time.
+- This creates a rhythm: bounce upward for a couple of seconds, land on a platform, recharge, go again — managing jump time *is* the skill.
+- **More presses still = higher**: every hop grows account-permanent LegPower, so each jump gets higher the longer you play.
 
-**Target design**:
-- Player **holds space to charge, releases to jump**. Charge duration (0 → full) maps to jump height.
-- **Starting jump is deliberately low** — players earn reach through LegPower (permanent), Charge Bonus (run-scoped loops), and optional Robux jump-power upgrades.
-- During charge the character shows a visible "crouch + leg swell" wind-up.
-
-Effective jump height stacks three layers:
+Per-hop apex height stacks:
 ```
-JumpHeight = BaseJump
-           × (1 + LegPowerBonus)      ← account-permanent, scales uncapped
-           × (1 + ChargeBonus)        ← run-scoped, from looping zones
-           × (1 + JumpUpgradeBonus)   ← optional, bought with Robux
-           × ChargeFraction           ← 0..1 from how long you held space
+HopApex = BaseApex
+        × (1 + LegPowerBonus)   ← account-permanent, scales uncapped
+        × (1 + ChargeBonus)     ← run-scoped, from looping zones
+        × (1 + JumpUpgradeBonus) ← optional, bought with Robux
 ```
 
 | Parameter | Initial value | Notes |
 |---|---|---|
-| Base jump height | 5.0 (lowered from 7.2 default) | Weak on purpose; you grow into power |
-| Time to full charge | 0.8s | Hold space to max |
-| Move speed while charging | ×0.3 | Slowed while charging, creates a tradeoff |
+| Base hop apex | 9 studs | Height of one hop at LegPower 0 |
+| Max jump time | 2.0s | Continuous jumping per burst |
+| Recharge rate | 1.5s per grounded second | Refills only while on the ground |
 
 ### 4.2 LegPower (Leg Muscle) — prototype exists, now account-permanent
 
@@ -282,7 +281,7 @@ src/
 
 ## 10. UI / UX
 
-- **Charge bar** under/above the character; release to jump.
+- **Jump-time bar** at the bottom center; drains while jumping, refills on the ground, turns red as it empties.
 - **LegPower indicator**: own leg girth + tier icon; other players show their tier above their head (stomp decision).
 - **Height & rank HUD**: current height, personal best, gap to nearest ghost / leaderboard rank.
 - **Currency HUD**: Leap Coins balance, +coins popups on new height.
@@ -308,9 +307,10 @@ src/
 
 | Parameter | Value |
 |---|---|
-| Base jump height | 5.0 (lowered) |
-| Time to full charge | 0.8s |
-| Move-speed multiplier while charging | ×0.3 |
+| Base hop apex | 9 studs |
+| Max jump time | 2.0s |
+| Jump-time recharge rate | 1.5s per grounded second |
+| Re-hop velocity threshold | 0.5 |
 | LegPower jump bonus | scales continuously, no cap |
 | Charge Bonus per loop / cap | +5% / +50% |
 | Double-jump height multiplier | ×0.8 |
@@ -337,12 +337,13 @@ src/
 ## 14. MVP Scope & Milestone Roadmap
 
 ### MVP (prove the core fun)
-- [ ] Charged jump (server-confirmed) with **low base jump**
-- [ ] LegPower growth + leg-girth visual, **persisted via DataStore**
-- [ ] Height tracking → Leap Coins payout (new-height-only)
+- [x] Continuous hold-to-jump with a jump-time meter (fall when empty, recharge on ground)
+- [x] LegPower growth (account-permanent) + leg/body girth visual, persisted via DataStore (in-memory fallback)
+- [x] Height tracking → Leap Coins payout (new-height-only)
+- [x] HUD (height / best / LegPower / coins) + jump-time bar
+- [x] One hand-built fixed test tower (30-platform zig-zag, built in Studio)
 - [ ] Loop-and-prestige Charge Bonus on a single test zone
 - [ ] Death zone + checkpoint respawn
-- [ ] One hand-built fixed test tower (skip full procedural gen for now)
 - [ ] Basic Feather wing (3s glide) + Glide Charge consumption (stub purchase)
 
 ### Milestones

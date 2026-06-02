@@ -53,7 +53,7 @@ function HUD.start()
 	local hint = makeLabel(holder, 5, Color3.fromRGB(150, 150, 160))
 	hint.TextSize = 14
 	hint.Font = Enum.Font.Gotham
-	hint.Text = "Hold SPACE to charge, release to jump"
+	hint.Text = "Hold SPACE to keep jumping — watch your jump time!"
 
 	local function refresh()
 		height.Text = string.format("Height: %d", (player:GetAttribute("Height") :: number?) or 0)
