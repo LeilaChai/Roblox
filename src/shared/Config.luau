@@ -21,6 +21,7 @@ Config.MAX_VERTICAL_SPEED = 240       -- safety clamp so very high LegPower can'
 Config.AIR_MOVE_SPEED = 18            -- horizontal speed while airborne (steer mid-jump / hover)
 Config.MAX_JUMP_TIME = 2.0            -- seconds you can stay airborne per burst (refills on landing)
 Config.LEGPOWER_TICK_INTERVAL = 0.15 -- how often holding counts as a press for LegPower growth
+Config.JUMP_BAR_DRAIN_RATE = 1.2     -- max speed the jump-power bar may visually drain (fraction/s); lower = slower
 
 -- ── LegPower (account-permanent, UNCAPPED) ──────────────────────
 Config.LEGPOWER_PER_JUMP = 1

@@ -23,7 +23,8 @@ local spent = false   -- reached the peak of the current jump; falling until we 
 local airTime = 0     -- safety: how long we've been rising (prevents sticking under a ledge)
 local tickAccum = 0   -- accumulates time to space out LegPower "presses"
 local lastGroundY = 0 -- Y of the platform we last stood on (jump-height reference)
-local barFraction = 1 -- 1 = full (ready / just launched), 0 = at the peak
+local barFraction = 1 -- 1 = full (ready / just launched), 0 = at the peak (true value)
+local displayedFraction = 1 -- smoothed value shown on the bar (drains slowly)
 
 local function getCharacter(): (Humanoid?, BasePart?)
 	local character = player.Character
@@ -69,7 +70,7 @@ local function updateBar()
 	if not barFill then
 		return
 	end
-	local fraction = math.clamp(barFraction, 0, 1)
+	local fraction = math.clamp(displayedFraction, 0, 1)
 	barFill.Size = UDim2.new(fraction, 0, 1, 0)
 	-- green with rise headroom left, red as you near the peak
 	barFill.BackgroundColor3 = Color3.fromRGB(
@@ -178,6 +179,16 @@ function JumpController.start()
 			end
 		else
 			tickAccum = 0
+		end
+
+		-- Ease the displayed bar toward the true power value: cap how fast it can
+		-- DRAIN (so it decreases slowly and readably), but refill instantly when a
+		-- new jump starts.
+		local target = math.clamp(barFraction, 0, 1)
+		if target < displayedFraction then
+			displayedFraction = math.max(target, displayedFraction - Config.JUMP_BAR_DRAIN_RATE * dt)
+		else
+			displayedFraction = target
 		end
 
 		updateBar()
