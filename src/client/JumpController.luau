@@ -1,8 +1,8 @@
 --!strict
--- Hold SPACE to keep jumping. A Jump-Time meter (seconds) drains while you
--- jump; when it empties you fall automatically and must land to recharge it.
--- Each hop scales with account-permanent LegPower (more presses = higher),
--- and the server independently grows LegPower on every hop.
+-- Hold SPACE to jump. You rise to your jump height; the progress bar drains as
+-- you rise and is EMPTY exactly at the peak — at which point you fall. Holding
+-- through a landing immediately jumps again, so you bounce up the tower.
+-- Jump height and rise/fall speed both scale with account-permanent LegPower.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,10 +19,11 @@ local JumpController = {}
 local ACTION_NAME = "LeapJump"
 
 local holding = false
-local jumpTime = Config.MAX_JUMP_TIME -- seconds of jumping remaining
-local depletedLock = false            -- true once drained; cleared on landing
-local tickAccum = 0                   -- accumulates time to space out LegPower "presses"
-local lastGroundY = 0                 -- Y of the platform we last stood on (jump-height reference)
+local spent = false   -- reached the peak of the current jump; falling until we land
+local airTime = 0     -- safety: how long we've been rising (prevents sticking under a ledge)
+local tickAccum = 0   -- accumulates time to space out LegPower "presses"
+local lastGroundY = 0 -- Y of the platform we last stood on (jump-height reference)
+local barFraction = 1 -- 1 = full (ready / just launched), 0 = at the peak
 
 local function getCharacter(): (Humanoid?, BasePart?)
 	local character = player.Character
@@ -68,9 +69,9 @@ local function updateBar()
 	if not barFill then
 		return
 	end
-	local fraction = math.clamp(jumpTime / Config.MAX_JUMP_TIME, 0, 1)
+	local fraction = math.clamp(barFraction, 0, 1)
 	barFill.Size = UDim2.new(fraction, 0, 1, 0)
-	-- green when plenty of jump time, red when nearly out
+	-- green with rise headroom left, red as you near the peak
 	barFill.BackgroundColor3 = Color3.fromRGB(
 		math.floor(90 + (1 - fraction) * 165),
 		math.floor(80 + fraction * 120),
@@ -116,9 +117,9 @@ function JumpController.start()
 
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		if grounded then
-			-- Touching down instantly refills jump time — no waiting to jump again.
-			jumpTime = Config.MAX_JUMP_TIME
-			depletedLock = false
+			-- Touch down -> ready to jump again immediately (bar full).
+			spent = false
+			airTime = 0
 			lastGroundY = hrp.Position.Y -- launch reference for the jump-height cap
 		end
 
@@ -136,23 +137,20 @@ function JumpController.start()
 		-- Horizontal steering from movement input, so you can move while jumping.
 		local move = humanoid.MoveDirection * Config.AIR_MOVE_SPEED
 		local velocity = hrp.AssemblyLinearVelocity
-		local active = holding and jumpTime > 0 and not depletedLock
+		local heightGained = hrp.Position.Y - lastGroundY
+		local rising = holding and not spent and heightGained < maxJumpHeight
 
-		if active then
+		if rising then
+			-- Rise fast toward your jump height. The bar drains with height gained
+			-- and hits empty exactly at the peak.
+			hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseSpeed, move.Z)
+			barFraction = 1 - heightGained / maxJumpHeight
+
 			if not grounded then
-				jumpTime = math.max(0, jumpTime - dt) -- airborne time drains the meter
-				if jumpTime <= 0 then
-					depletedLock = true -- out of time -> fall until we land
+				airTime += dt
+				if airTime > Config.MAX_JUMP_TIME then
+					spent = true -- safety: blocked under a ledge, stop trying to rise
 				end
-			end
-
-			local heightGained = hrp.Position.Y - lastGroundY
-			if heightGained < maxJumpHeight then
-				-- Rise fast toward your jump height (smooth, constant = no glitch).
-				hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseSpeed, move.Z)
-			else
-				-- Reached your jump height: hover and steer until jump time runs out.
-				hrp.AssemblyLinearVelocity = Vector3.new(move.X, 0, move.Z)
 			end
 
 			-- Holding counts as repeated presses for LegPower growth (rate-limited).
@@ -163,6 +161,12 @@ function JumpController.start()
 			end
 		else
 			tickAccum = 0
+			-- Peak reached (or released): commit to falling until we land again.
+			if holding and not grounded then
+				spent = true
+			end
+			barFraction = grounded and 1 or 0
+
 			-- Thicker legs fall faster: enforce a LegPower-scaled minimum fall speed,
 			-- while still letting you steer horizontally on the way down.
 			if not grounded and velocity.Y < 0 then
