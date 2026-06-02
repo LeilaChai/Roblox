@@ -57,30 +57,32 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 
 ## 4. Core Mechanics in Detail
 
-### 4.1 Continuous Jump (hold to keep jumping) — implemented (M1)
+### 4.1 Jump: height + speed (hold to rise & hover) — implemented (M1)
 
-**Design** (replaces the earlier hold-to-charge model, which felt too slow):
-- **Tap or hold Space and the character keeps jumping** — no charge wind-up, instant and responsive. Holding drives a **smooth, constant upward speed** (no per-arc snapping, so the motion stays glitch-free).
-- A **Jump-Time meter** (in seconds) drains while you are airborne and jumping. When it hits zero you **fall automatically**, and the meter **refills the instant you land** (no waiting — you can jump again immediately). The on-screen bar shows the remaining jump time.
-- This creates a rhythm: rise for a couple of seconds, land on a platform, instantly refilled, go again — managing your airborne jump time *is* the skill.
-- **More presses = faster *and* higher (coupled)**: every tick of holding grows account-permanent LegPower, which raises your **rise speed and fall speed** together. The point is the coupling — the higher you can jump, the faster you rise to reach that height, and the faster you fall back down. Base speeds are kept modest on purpose so the speed-up comes from LegPower growth, not a flat boost.
-- **Full air control**: horizontal movement comes from your input (`MoveDirection × Air Move Speed`) every frame, so you steer freely while rising and falling.
-- **No animation glitch**: the Humanoid's `Jumping` state is disabled (no jump-anim replay; airborne uses a stable Freefall pose), and the leg/body girth only updates when the LegPower **tier** changes (re-fitting the rig every frame was causing a leg twitch). A `MAX_VERTICAL_SPEED` clamp keeps very high speeds from tunneling through platforms.
+**Design** — jump **height** and jump **speed** are separate stats, both growing with LegPower:
+- **Hold Space to jump up.** You rise fast to your **jump height** (how far above the platform you left), then **hover** at that height — steering freely — until your jump time runs out, then you fall. Release early to drop sooner.
+- **Jump height starts LOW** — `6 studs`, below Roblox's default `7.2` — and grows with LegPower. So a fresh player is weak; the higher you can jump, the bigger the gaps you can clear.
+- **Rise & fall speed are separate and fast**, and also scale with LegPower: the higher you can jump, the faster you rise to that height and the faster you fall back down.
+- A **Jump-Time meter** (seconds) drains while airborne; at zero you fall automatically; it **refills the instant you land**. The on-screen bar shows it.
+- **Full air control**: horizontal movement follows your input (`MoveDirection × Air Move Speed`) every frame — steer while rising, hovering, or falling.
+- **No animation glitch**: the Humanoid `Jumping` state is disabled (airborne uses a stable Freefall pose), girth only updates on LegPower **tier** change, and a `MAX_VERTICAL_SPEED` clamp prevents tunneling through platforms.
 
-Rise and fall speed scale with LegPower:
 ```
-RiseSpeed = BaseRiseSpeed × (1 + LegPowerSpeedBonus) × (1 + ChargeBonus) × (1 + JumpUpgradeBonus)
-FallSpeed = BaseFallSpeed × (1 + LegPowerSpeedBonus)        ← thicker legs fall faster
+JumpHeight = BaseJumpHeight × (1 + LegPowerHeightBonus) × (1 + ChargeBonus)   ← how high (starts < default)
+RiseSpeed  = BaseRiseSpeed  × (1 + LegPowerSpeedBonus)  × (1 + ChargeBonus)   ← how fast up
+FallSpeed  = BaseFallSpeed  × (1 + LegPowerSpeedBonus)                        ← how fast down (thicker = faster)
 ```
 
 | Parameter | Initial value | Notes |
 |---|---|---|
-| Base rise speed | 65 studs/s | Modest at LegPower 0; LegPower drives the speed-up |
-| Base fall speed | 80 studs/s | Modest at LegPower 0; rises with LegPower |
+| Base jump height | 6 studs | Above the launch platform, at LegPower 0 (< 7.2 default) |
+| LegPower height bonus | +0.2% per press | +200% jump height at 1000 presses |
+| Base rise speed | 120 studs/s | Snappy; scales with LegPower |
+| Base fall speed | 90 studs/s | Scales with LegPower (thicker = faster) |
 | LegPower speed bonus | +0.4% per press, uncapped | +100% at 250 presses, +400% at 1000 |
 | Max vertical speed | 240 studs/s | Safety clamp (prevents platform tunneling) |
-| Air move speed | 16 studs/s | Horizontal steering while airborne |
-| Max jump time | 2.0s | Airborne jumping per burst; refills fully on landing |
+| Air move speed | 18 studs/s | Horizontal steering while airborne |
+| Max jump time | 2.0s | Airborne/hover budget; refills fully on landing |
 | LegPower tick interval | 0.15s | How often holding counts as a press |
 
 ### 4.2 LegPower (Leg Muscle) — prototype exists, now account-permanent
@@ -311,10 +313,11 @@ src/
 
 | Parameter | Value |
 |---|---|
-| Base rise speed | 65 studs/s (modest; LegPower drives the speed-up) |
-| Base fall speed | 80 studs/s (scales up with LegPower) |
+| Base jump height | 6 studs (< 7.2 default), +0.2%/press |
+| Base rise speed | 120 studs/s (scales with LegPower) |
+| Base fall speed | 90 studs/s (scales with LegPower) |
 | Max vertical speed | 240 studs/s (anti-tunneling clamp) |
-| Air move speed | 16 studs/s |
+| Air move speed | 18 studs/s |
 | Max jump time | 2.0s (refills instantly on landing) |
 | LegPower speed bonus | +0.4% per press, uncapped (+100% @250, +400% @1000) |
 | LegPower tick interval | 0.15s while holding |

@@ -22,6 +22,7 @@ local holding = false
 local jumpTime = Config.MAX_JUMP_TIME -- seconds of jumping remaining
 local depletedLock = false            -- true once drained; cleared on landing
 local tickAccum = 0                   -- accumulates time to space out LegPower "presses"
+local lastGroundY = 0                 -- Y of the platform we last stood on (jump-height reference)
 
 local function getCharacter(): (Humanoid?, BasePart?)
 	local character = player.Character
@@ -77,13 +78,6 @@ local function updateBar()
 	)
 end
 
--- Speed multiplier from LegPower (account-permanent) + ChargeBonus (run-scoped).
-local function speedMultiplier(): number
-	local legPower = (player:GetAttribute("LegPower") :: number?) or 0
-	local chargeBonus = (player:GetAttribute("ChargeBonus") :: number?) or 0
-	return (1 + legPower * Config.LEGPOWER_SPEED_BONUS_PER_PRESS) * (1 + chargeBonus)
-end
-
 -- Disable the Humanoid's Jumping state so Roblox doesn't keep replaying the
 -- jump animation each time we apply upward velocity. We drive the vertical
 -- movement ourselves; airborne stays in a stable Freefall pose.
@@ -125,27 +119,41 @@ function JumpController.start()
 			-- Touching down instantly refills jump time — no waiting to jump again.
 			jumpTime = Config.MAX_JUMP_TIME
 			depletedLock = false
+			lastGroundY = hrp.Position.Y -- launch reference for the jump-height cap
 		end
 
-		local mult = speedMultiplier()
-		local velocity = hrp.AssemblyLinearVelocity
-		local active = holding and jumpTime > 0 and not depletedLock
+		-- LegPower (account-permanent) + ChargeBonus (run-scoped) drive both how
+		-- HIGH you can jump and how FAST you rise/fall.
+		local legPower = (player:GetAttribute("LegPower") :: number?) or 0
+		local chargeBonus = (player:GetAttribute("ChargeBonus") :: number?) or 0
+		local speedMult = (1 + legPower * Config.LEGPOWER_SPEED_BONUS_PER_PRESS) * (1 + chargeBonus)
+		local heightMult = (1 + legPower * Config.LEGPOWER_HEIGHT_BONUS_PER_PRESS) * (1 + chargeBonus)
+
+		local maxJumpHeight = Config.BASE_JUMP_HEIGHT * heightMult
+		local riseSpeed = math.min(Config.JUMP_RISE_SPEED * speedMult, Config.MAX_VERTICAL_SPEED)
+		local fallSpeed = math.min(Config.BASE_FALL_SPEED * speedMult, Config.MAX_VERTICAL_SPEED)
 
 		-- Horizontal steering from movement input, so you can move while jumping.
 		local move = humanoid.MoveDirection * Config.AIR_MOVE_SPEED
+		local velocity = hrp.AssemblyLinearVelocity
+		local active = holding and jumpTime > 0 and not depletedLock
 
 		if active then
 			if not grounded then
-				jumpTime = math.max(0, jumpTime - dt) -- only airborne jumping drains time
+				jumpTime = math.max(0, jumpTime - dt) -- airborne time drains the meter
 				if jumpTime <= 0 then
 					depletedLock = true -- out of time -> fall until we land
 				end
 			end
 
-			-- Smooth, constant upward speed every frame (no apex snapping = no glitch).
-			-- Faster with thicker legs, clamped so it can't tunnel through platforms.
-			local riseSpeed = math.min(Config.JUMP_RISE_SPEED * mult, Config.MAX_VERTICAL_SPEED)
-			hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseSpeed, move.Z)
+			local heightGained = hrp.Position.Y - lastGroundY
+			if heightGained < maxJumpHeight then
+				-- Rise fast toward your jump height (smooth, constant = no glitch).
+				hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseSpeed, move.Z)
+			else
+				-- Reached your jump height: hover and steer until jump time runs out.
+				hrp.AssemblyLinearVelocity = Vector3.new(move.X, 0, move.Z)
+			end
 
 			-- Holding counts as repeated presses for LegPower growth (rate-limited).
 			tickAccum += dt
@@ -158,10 +166,8 @@ function JumpController.start()
 			-- Thicker legs fall faster: enforce a LegPower-scaled minimum fall speed,
 			-- while still letting you steer horizontally on the way down.
 			if not grounded and velocity.Y < 0 then
-				local fallSpeed = math.min(Config.BASE_FALL_SPEED * mult, Config.MAX_VERTICAL_SPEED)
-				if velocity.Y > -fallSpeed then
-					hrp.AssemblyLinearVelocity = Vector3.new(move.X, -fallSpeed, move.Z)
-				end
+				local vy = math.min(velocity.Y, -fallSpeed)
+				hrp.AssemblyLinearVelocity = Vector3.new(move.X, vy, move.Z)
 			end
 		end
 
