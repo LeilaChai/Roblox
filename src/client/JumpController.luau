@@ -131,6 +131,9 @@ function JumpController.start()
 		local velocity = hrp.AssemblyLinearVelocity
 		local active = holding and jumpTime > 0 and not depletedLock
 
+		-- Horizontal steering from movement input, so you can move while jumping.
+		local move = humanoid.MoveDirection * Config.AIR_MOVE_SPEED
+
 		if active then
 			if not grounded then
 				jumpTime = math.max(0, jumpTime - dt) -- only airborne jumping drains time
@@ -142,7 +145,7 @@ function JumpController.start()
 			-- Smooth, constant upward speed every frame (no apex snapping = no glitch).
 			-- Faster with thicker legs, clamped so it can't tunnel through platforms.
 			local riseSpeed = math.min(Config.JUMP_RISE_SPEED * mult, Config.MAX_VERTICAL_SPEED)
-			hrp.AssemblyLinearVelocity = Vector3.new(velocity.X, riseSpeed, velocity.Z)
+			hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseSpeed, move.Z)
 
 			-- Holding counts as repeated presses for LegPower growth (rate-limited).
 			tickAccum += dt
@@ -152,11 +155,12 @@ function JumpController.start()
 			end
 		else
 			tickAccum = 0
-			-- Thicker legs fall faster: enforce a LegPower-scaled minimum fall speed.
+			-- Thicker legs fall faster: enforce a LegPower-scaled minimum fall speed,
+			-- while still letting you steer horizontally on the way down.
 			if not grounded and velocity.Y < 0 then
 				local fallSpeed = math.min(Config.BASE_FALL_SPEED * mult, Config.MAX_VERTICAL_SPEED)
 				if velocity.Y > -fallSpeed then
-					hrp.AssemblyLinearVelocity = Vector3.new(velocity.X, -fallSpeed, velocity.Z)
+					hrp.AssemblyLinearVelocity = Vector3.new(move.X, -fallSpeed, move.Z)
 				end
 			end
 		end
