@@ -63,7 +63,8 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 - **Tap or hold Space and the character keeps jumping** — no charge wind-up, instant and responsive. Holding drives a **smooth, constant upward speed** (no per-arc snapping, so the motion stays glitch-free).
 - A **Jump-Time meter** (in seconds) drains while you are airborne and jumping. When it hits zero you **fall automatically**, and the meter **refills the instant you land** (no waiting — you can jump again immediately). The on-screen bar shows the remaining jump time.
 - This creates a rhythm: rise for a couple of seconds, land on a platform, instantly refilled, go again — managing your airborne jump time *is* the skill.
-- **More presses = faster and higher**: every tick of holding grows account-permanent LegPower, which raises both your **rise speed and fall speed**, so you climb (and drop) faster the longer you play.
+- **More presses = faster and higher**: every tick of holding grows account-permanent LegPower, which raises both your **rise speed and fall speed** (dramatically, uncapped), so you climb — and drop — much faster the longer you play.
+- **No animation glitch**: the Humanoid's `Jumping` state is disabled so Roblox doesn't replay the jump animation each frame; airborne uses a stable Freefall pose. A `MAX_VERTICAL_SPEED` clamp keeps very high speeds from tunneling through platforms.
 
 Rise and fall speed scale with LegPower:
 ```
@@ -73,8 +74,9 @@ FallSpeed = BaseFallSpeed × (1 + LegPowerSpeedBonus)        ← thicker legs fa
 
 | Parameter | Initial value | Notes |
 |---|---|---|
-| Base rise speed | 42 studs/s | Upward speed while holding, at LegPower 0 |
-| Base fall speed | 55 studs/s | Minimum fall speed at LegPower 0; rises with LegPower |
+| Base rise speed | 50 studs/s | Upward speed while holding, at LegPower 0 |
+| Base fall speed | 75 studs/s | Minimum fall speed at LegPower 0; rises with LegPower |
+| Max vertical speed | 200 studs/s | Safety clamp (prevents platform tunneling) |
 | Max jump time | 2.0s | Airborne jumping per burst; refills fully on landing |
 | LegPower tick interval | 0.15s | How often holding counts as a press |
 
@@ -306,10 +308,11 @@ src/
 
 | Parameter | Value |
 |---|---|
-| Base rise speed | 42 studs/s |
-| Base fall speed | 55 studs/s (scales up with LegPower) |
+| Base rise speed | 50 studs/s |
+| Base fall speed | 75 studs/s (scales up with LegPower) |
+| Max vertical speed | 200 studs/s (anti-tunneling clamp) |
 | Max jump time | 2.0s (refills instantly on landing) |
-| LegPower speed bonus | +0.05% per press, uncapped |
+| LegPower speed bonus | +0.15% per press, uncapped |
 | LegPower tick interval | 0.15s while holding |
 | LegPower jump bonus | scales continuously, no cap |
 | Charge Bonus per loop / cap | +5% / +50% |

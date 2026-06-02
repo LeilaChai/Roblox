@@ -84,7 +84,22 @@ local function speedMultiplier(): number
 	return (1 + legPower * Config.LEGPOWER_SPEED_BONUS_PER_PRESS) * (1 + chargeBonus)
 end
 
+-- Disable the Humanoid's Jumping state so Roblox doesn't keep replaying the
+-- jump animation each time we apply upward velocity. We drive the vertical
+-- movement ourselves; airborne stays in a stable Freefall pose.
+local function setupCharacter(character: Model)
+	local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
+	if humanoid and humanoid:IsA("Humanoid") then
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+	end
+end
+
 function JumpController.start()
+	if player.Character then
+		setupCharacter(player.Character)
+	end
+	player.CharacterAdded:Connect(setupCharacter)
+
 	buildBar()
 
 	ContextActionService:BindAction(ACTION_NAME, function(_, inputState)
@@ -125,8 +140,8 @@ function JumpController.start()
 			end
 
 			-- Smooth, constant upward speed every frame (no apex snapping = no glitch).
-			-- Faster with thicker legs.
-			local riseSpeed = Config.JUMP_RISE_SPEED * mult
+			-- Faster with thicker legs, clamped so it can't tunnel through platforms.
+			local riseSpeed = math.min(Config.JUMP_RISE_SPEED * mult, Config.MAX_VERTICAL_SPEED)
 			hrp.AssemblyLinearVelocity = Vector3.new(velocity.X, riseSpeed, velocity.Z)
 
 			-- Holding counts as repeated presses for LegPower growth (rate-limited).
@@ -139,7 +154,7 @@ function JumpController.start()
 			tickAccum = 0
 			-- Thicker legs fall faster: enforce a LegPower-scaled minimum fall speed.
 			if not grounded and velocity.Y < 0 then
-				local fallSpeed = Config.BASE_FALL_SPEED * mult
+				local fallSpeed = math.min(Config.BASE_FALL_SPEED * mult, Config.MAX_VERTICAL_SPEED)
 				if velocity.Y > -fallSpeed then
 					hrp.AssemblyLinearVelocity = Vector3.new(velocity.X, -fallSpeed, velocity.Z)
 				end
