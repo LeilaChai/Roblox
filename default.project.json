@@ -1,31 +1,28 @@
 {
-  "name": "Leap",
+  "name": "Roblox",
   "tree": {
     "$className": "DataModel",
 
     "ReplicatedStorage": {
-      "Shared": {
         "$path": "src/shared"
-      }
     },
 
     "ServerScriptService": {
-      "Server": {
         "$path": "src/server"
-      }
     },
 
     "StarterPlayer": {
       "StarterPlayerScripts": {
-        "Client": {
           "$path": "src/client"
-        }
+      },
+      "StarterCharacterScripts": {
+          "$path": "src/character"
       }
     },
 
     "Workspace": {
       "$properties": {
-        "FilteringEnabled": true
+        "StreamingEnabled": true
       },
       "Baseplate": {
         "$className": "Part",
