@@ -152,15 +152,7 @@ function JumpController.start()
 					spent = true -- safety: blocked under a ledge, stop trying to rise
 				end
 			end
-
-			-- Holding counts as repeated presses for LegPower growth (rate-limited).
-			tickAccum += dt
-			while tickAccum >= Config.LEGPOWER_TICK_INTERVAL do
-				tickAccum -= Config.LEGPOWER_TICK_INTERVAL
-				Remotes.RequestJump:FireServer(1)
-			end
 		else
-			tickAccum = 0
 			-- Peak reached (or released): commit to falling until we land again.
 			if holding and not grounded then
 				spent = true
@@ -173,6 +165,19 @@ function JumpController.start()
 				local vy = math.min(velocity.Y, -fallSpeed)
 				hrp.AssemblyLinearVelocity = Vector3.new(move.X, vy, move.Z)
 			end
+		end
+
+		-- Holding Space = "pressing" the jump: grow account-permanent LegPower the
+		-- whole time it's held (any phase), so the more/longer you press, the higher
+		-- and faster you jump AND the thicker your legs get. Server is authoritative.
+		if holding then
+			tickAccum += dt
+			while tickAccum >= Config.LEGPOWER_TICK_INTERVAL do
+				tickAccum -= Config.LEGPOWER_TICK_INTERVAL
+				Remotes.RequestJump:FireServer(1)
+			end
+		else
+			tickAccum = 0
 		end
 
 		updateBar()
