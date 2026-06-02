@@ -115,18 +115,23 @@ function JumpController.start()
 
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		if grounded then
-			-- Recharge and allow jumping again once we touch down.
-			jumpTime = math.min(Config.MAX_JUMP_TIME, jumpTime + dt * Config.JUMP_TIME_RECHARGE_RATE)
+			-- Touching down instantly refills jump time — no waiting to jump again.
+			jumpTime = Config.MAX_JUMP_TIME
 			depletedLock = false
 		end
 
 		local active = holding and jumpTime > 0 and not depletedLock
 		if active then
-			jumpTime = math.max(0, jumpTime - dt)
+			if not grounded then
+				jumpTime = math.max(0, jumpTime - dt) -- only airborne jumping drains time
+			end
+
 			if jumpTime <= 0 then
 				depletedLock = true -- out of time -> fall until we land
-			elseif hrp.AssemblyLinearVelocity.Y <= Config.HOP_REJUMP_VELOCITY then
-				applyHop(hrp) -- re-hop at the top of each arc for a jumping rhythm
+			elseif grounded or hrp.AssemblyLinearVelocity.Y < 0 then
+				-- Hop off the ground, then re-hop exactly once per arc (the frame we
+				-- begin to descend) for a smooth, glitch-free bounce.
+				applyHop(hrp)
 			end
 		end
 

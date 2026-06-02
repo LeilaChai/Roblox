@@ -33,7 +33,7 @@
 ```
 Enter game (solo or shared server) → spawn at the base
    ↓
-Hold Space to keep jumping up (burns jump time; each hop: +LegPower permanently; thicker legs = higher hop + faster fall) → land to recharge jump time
+Hold Space to keep jumping up (burns jump time; each hop: +LegPower permanently; thicker legs = higher hop + faster fall) → land to instantly refill jump time
    ↓
 Run out of jump time mid-air → fall automatically until you land
    ↓
@@ -61,8 +61,8 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 
 **Design** (replaces the earlier hold-to-charge model, which felt too slow):
 - **Tap or hold Space and the character keeps jumping** — no charge wind-up, instant and responsive. While Space is held it auto-hops at the top of each arc.
-- A **Jump-Time meter** (in seconds) drains while you are jumping. When it hits zero you **fall automatically**, and must **land to recharge** it. The on-screen bar shows the remaining jump time.
-- This creates a rhythm: bounce upward for a couple of seconds, land on a platform, recharge, go again — managing jump time *is* the skill.
+- A **Jump-Time meter** (in seconds) drains while you are airborne and jumping. When it hits zero you **fall automatically**, and the meter **refills the instant you land** (no waiting — you can jump again immediately). The on-screen bar shows the remaining jump time.
+- This creates a rhythm: bounce upward for a couple of seconds, land on a platform, instantly refilled, go again — managing your airborne jump time *is* the skill.
 - **More presses still = higher**: every hop grows account-permanent LegPower, so each jump gets higher the longer you play.
 
 Per-hop apex height stacks:
@@ -76,8 +76,7 @@ HopApex = BaseApex
 | Parameter | Initial value | Notes |
 |---|---|---|
 | Base hop apex | 9 studs | Height of one hop at LegPower 0 |
-| Max jump time | 2.0s | Continuous jumping per burst |
-| Recharge rate | 1.5s per grounded second | Refills only while on the ground |
+| Max jump time | 2.0s | Airborne jumping per burst; refills fully on landing |
 
 ### 4.2 LegPower (Leg Muscle) — prototype exists, now account-permanent
 
@@ -308,9 +307,7 @@ src/
 | Parameter | Value |
 |---|---|
 | Base hop apex | 9 studs |
-| Max jump time | 2.0s |
-| Jump-time recharge rate | 1.5s per grounded second |
-| Re-hop velocity threshold | 0.5 |
+| Max jump time | 2.0s (refills instantly on landing) |
 | LegPower jump bonus | scales continuously, no cap |
 | Charge Bonus per loop / cap | +5% / +50% |
 | Double-jump height multiplier | ×0.8 |

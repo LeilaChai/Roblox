@@ -5,10 +5,8 @@
 local Config = {}
 
 -- ── Continuous jump (hold Space to keep jumping, time-limited) ──
-Config.JUMP_APEX_HEIGHT = 9          -- studs per hop, before LegPower scaling
-Config.MAX_JUMP_TIME = 2.0           -- seconds of continuous jumping per burst
-Config.JUMP_TIME_RECHARGE_RATE = 1.5 -- jump-seconds restored per grounded second
-Config.HOP_REJUMP_VELOCITY = 0.5     -- re-hop once upward velocity drops below this
+Config.JUMP_APEX_HEIGHT = 9   -- studs per hop, before LegPower scaling
+Config.MAX_JUMP_TIME = 2.0    -- seconds of airborne jumping per burst (refills fully on landing)
 
 -- ── LegPower (account-permanent, UNCAPPED jump bonus) ───────────
 Config.LEGPOWER_PER_JUMP = 1
