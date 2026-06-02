@@ -5,8 +5,11 @@
 local Config = {}
 
 -- ── Continuous jump (hold Space to keep jumping, time-limited) ──
-Config.JUMP_RISE_SPEED = 90           -- base upward speed (studs/s) while holding, at LegPower 0
-Config.BASE_FALL_SPEED = 110          -- base minimum fall speed (studs/s) at LegPower 0 (heavier than rise)
+-- Base speeds are intentionally MODEST — the dramatic speed comes from LegPower
+-- growth (see LEGPOWER_SPEED_BONUS_PER_PRESS), so the higher you can jump, the
+-- faster you rise to that point and the faster you fall back down.
+Config.JUMP_RISE_SPEED = 65           -- base upward speed (studs/s) while holding, at LegPower 0
+Config.BASE_FALL_SPEED = 80           -- base minimum fall speed (studs/s) at LegPower 0 (heavier than rise)
 Config.MAX_VERTICAL_SPEED = 240       -- safety clamp so very high LegPower can't tunnel through platforms
 Config.AIR_MOVE_SPEED = 16            -- horizontal speed while airborne (lets you steer mid-jump)
 Config.MAX_JUMP_TIME = 2.0            -- seconds of airborne jumping per burst (refills fully on landing)
@@ -14,9 +17,9 @@ Config.LEGPOWER_TICK_INTERVAL = 0.15 -- how often a held jump counts as a press 
 
 -- ── LegPower (account-permanent, UNCAPPED) ──────────────────────
 Config.LEGPOWER_PER_JUMP = 1
--- Higher LegPower => DRAMATICALLY faster jumping AND falling (and thus higher reach). Uncapped.
--- 0.0015 => +150% jump/fall speed at 1000 presses (then clamped by MAX_VERTICAL_SPEED).
-Config.LEGPOWER_SPEED_BONUS_PER_PRESS = 0.0015
+-- The core coupling: higher LegPower => BOTH jump higher AND rise/fall faster.
+-- 0.004 => +100% rise & fall speed at 250 presses, +400% at 1000 (then clamped).
+Config.LEGPOWER_SPEED_BONUS_PER_PRESS = 0.004
 
 -- Visual leg/body girth by tier. Applied only when the tier changes (never
 -- every frame) so the avatar doesn't re-fit its rig and jitter.
