@@ -5,13 +5,16 @@
 local Config = {}
 
 -- ── Continuous jump (hold Space to keep jumping, time-limited) ──
-Config.JUMP_APEX_HEIGHT = 9   -- studs per hop, before LegPower scaling
-Config.MAX_JUMP_TIME = 2.0    -- seconds of airborne jumping per burst (refills fully on landing)
+Config.JUMP_RISE_SPEED = 42           -- base upward speed (studs/s) while holding, at LegPower 0
+Config.BASE_FALL_SPEED = 55           -- minimum fall speed (studs/s) at LegPower 0
+Config.MAX_JUMP_TIME = 2.0            -- seconds of airborne jumping per burst (refills fully on landing)
+Config.LEGPOWER_TICK_INTERVAL = 0.15 -- how often a held jump counts as a press for LegPower growth
 
--- ── LegPower (account-permanent, UNCAPPED jump bonus) ───────────
+-- ── LegPower (account-permanent, UNCAPPED) ──────────────────────
 Config.LEGPOWER_PER_JUMP = 1
--- Jump-height bonus per accumulated press. 0.0006 => ~+60% at 1000 presses.
-Config.LEGPOWER_JUMP_BONUS_PER_PRESS = 0.0006
+-- Higher LegPower => faster jumping AND falling (and thus higher reach). Uncapped.
+-- 0.0005 => +50% jump/fall speed at 1000 presses.
+Config.LEGPOWER_SPEED_BONUS_PER_PRESS = 0.0005
 
 -- Visual leg/body girth growth (soft-capped so avatars stay sane).
 Config.GIRTH_PER_PRESS = 0.00015

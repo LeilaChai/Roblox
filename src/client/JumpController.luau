@@ -8,7 +8,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
-local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
@@ -22,6 +21,7 @@ local ACTION_NAME = "LeapJump"
 local holding = false
 local jumpTime = Config.MAX_JUMP_TIME -- seconds of jumping remaining
 local depletedLock = false            -- true once drained; cleared on landing
+local tickAccum = 0                   -- accumulates time to space out LegPower "presses"
 
 local function getCharacter(): (Humanoid?, BasePart?)
 	local character = player.Character
@@ -77,22 +77,11 @@ local function updateBar()
 	)
 end
 
--- ── Hop ──────────────────────────────────────────────────────────
-local function applyHop(hrp: BasePart)
+-- Speed multiplier from LegPower (account-permanent) + ChargeBonus (run-scoped).
+local function speedMultiplier(): number
 	local legPower = (player:GetAttribute("LegPower") :: number?) or 0
 	local chargeBonus = (player:GetAttribute("ChargeBonus") :: number?) or 0
-	local apex = Config.JUMP_APEX_HEIGHT
-		* (1 + legPower * Config.LEGPOWER_JUMP_BONUS_PER_PRESS)
-		* (1 + chargeBonus)
-
-	local g = Workspace.Gravity
-	local velocity = math.sqrt(2 * g * apex)
-
-	local current = hrp.AssemblyLinearVelocity
-	hrp.AssemblyLinearVelocity = Vector3.new(current.X, velocity, current.Z)
-
-	-- Each hop counts as a press for LegPower growth (server is authoritative).
-	Remotes.RequestJump:FireServer(1)
+	return (1 + legPower * Config.LEGPOWER_SPEED_BONUS_PER_PRESS) * (1 + chargeBonus)
 end
 
 function JumpController.start()
@@ -112,6 +101,9 @@ function JumpController.start()
 		if not humanoid or not hrp then
 			return
 		end
+		if humanoid.Health <= 0 or humanoid.Sit then
+			return
+		end
 
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		if grounded then
@@ -120,18 +112,37 @@ function JumpController.start()
 			depletedLock = false
 		end
 
+		local mult = speedMultiplier()
+		local velocity = hrp.AssemblyLinearVelocity
 		local active = holding and jumpTime > 0 and not depletedLock
+
 		if active then
 			if not grounded then
 				jumpTime = math.max(0, jumpTime - dt) -- only airborne jumping drains time
+				if jumpTime <= 0 then
+					depletedLock = true -- out of time -> fall until we land
+				end
 			end
 
-			if jumpTime <= 0 then
-				depletedLock = true -- out of time -> fall until we land
-			elseif grounded or hrp.AssemblyLinearVelocity.Y < 0 then
-				-- Hop off the ground, then re-hop exactly once per arc (the frame we
-				-- begin to descend) for a smooth, glitch-free bounce.
-				applyHop(hrp)
+			-- Smooth, constant upward speed every frame (no apex snapping = no glitch).
+			-- Faster with thicker legs.
+			local riseSpeed = Config.JUMP_RISE_SPEED * mult
+			hrp.AssemblyLinearVelocity = Vector3.new(velocity.X, riseSpeed, velocity.Z)
+
+			-- Holding counts as repeated presses for LegPower growth (rate-limited).
+			tickAccum += dt
+			while tickAccum >= Config.LEGPOWER_TICK_INTERVAL do
+				tickAccum -= Config.LEGPOWER_TICK_INTERVAL
+				Remotes.RequestJump:FireServer(1)
+			end
+		else
+			tickAccum = 0
+			-- Thicker legs fall faster: enforce a LegPower-scaled minimum fall speed.
+			if not grounded and velocity.Y < 0 then
+				local fallSpeed = Config.BASE_FALL_SPEED * mult
+				if velocity.Y > -fallSpeed then
+					hrp.AssemblyLinearVelocity = Vector3.new(velocity.X, -fallSpeed, velocity.Z)
+				end
 			end
 		end
 

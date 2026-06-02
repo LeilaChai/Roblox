@@ -60,23 +60,23 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 ### 4.1 Continuous Jump (hold to keep jumping) — implemented (M1)
 
 **Design** (replaces the earlier hold-to-charge model, which felt too slow):
-- **Tap or hold Space and the character keeps jumping** — no charge wind-up, instant and responsive. While Space is held it auto-hops at the top of each arc.
+- **Tap or hold Space and the character keeps jumping** — no charge wind-up, instant and responsive. Holding drives a **smooth, constant upward speed** (no per-arc snapping, so the motion stays glitch-free).
 - A **Jump-Time meter** (in seconds) drains while you are airborne and jumping. When it hits zero you **fall automatically**, and the meter **refills the instant you land** (no waiting — you can jump again immediately). The on-screen bar shows the remaining jump time.
-- This creates a rhythm: bounce upward for a couple of seconds, land on a platform, instantly refilled, go again — managing your airborne jump time *is* the skill.
-- **More presses still = higher**: every hop grows account-permanent LegPower, so each jump gets higher the longer you play.
+- This creates a rhythm: rise for a couple of seconds, land on a platform, instantly refilled, go again — managing your airborne jump time *is* the skill.
+- **More presses = faster and higher**: every tick of holding grows account-permanent LegPower, which raises both your **rise speed and fall speed**, so you climb (and drop) faster the longer you play.
 
-Per-hop apex height stacks:
+Rise and fall speed scale with LegPower:
 ```
-HopApex = BaseApex
-        × (1 + LegPowerBonus)   ← account-permanent, scales uncapped
-        × (1 + ChargeBonus)     ← run-scoped, from looping zones
-        × (1 + JumpUpgradeBonus) ← optional, bought with Robux
+RiseSpeed = BaseRiseSpeed × (1 + LegPowerSpeedBonus) × (1 + ChargeBonus) × (1 + JumpUpgradeBonus)
+FallSpeed = BaseFallSpeed × (1 + LegPowerSpeedBonus)        ← thicker legs fall faster
 ```
 
 | Parameter | Initial value | Notes |
 |---|---|---|
-| Base hop apex | 9 studs | Height of one hop at LegPower 0 |
+| Base rise speed | 42 studs/s | Upward speed while holding, at LegPower 0 |
+| Base fall speed | 55 studs/s | Minimum fall speed at LegPower 0; rises with LegPower |
 | Max jump time | 2.0s | Airborne jumping per burst; refills fully on landing |
+| LegPower tick interval | 0.15s | How often holding counts as a press |
 
 ### 4.2 LegPower (Leg Muscle) — prototype exists, now account-permanent
 
@@ -86,11 +86,11 @@ HopApex = BaseApex
 - **`LegPower`** is a server-authoritative, **account-permanent** stat saved via DataStore. Every spacebar press increments it; it **never resets**. The longer a player plays, the thicker their legs.
 - LegPower drives:
   1. **Visual**: leg mesh/scale thickens by tier (`UpdateMuscle`).
-  2. **Jump ceiling**: higher LegPower → higher jumps, scaling **continuously with no cap** — long-term players keep getting stronger.
+  2. **Jump & fall speed**: higher LegPower → faster rising *and* faster falling (and thus higher reach), scaling **continuously with no cap** — long-term players keep getting stronger.
   3. **Stomp resolution**: decides stomp outcome when other players are present (see 4.3).
-  4. **Fall cost (the counter)**: thicker legs → faster fall acceleration and a **lower fall-damage threshold**. Big legs stay genuinely risky near death zones. *(Confirmed kept.)*
+  4. **Fall cost (the counter)**: thicker legs fall faster and have a **lower fall-damage threshold**. Big legs stay genuinely risky near death zones. *(Confirmed kept.)*
 
-| LegPower tier | Cumulative presses (approx) | Jump bonus (no cap) | Fall accel | Visual leg girth |
+| LegPower tier | Cumulative presses (approx) | Jump/fall speed bonus (no cap) | Fall accel | Visual leg girth |
 |---|---|---|---|---|
 | 1 | 0–250 | +0% | ×1.0 | 100% |
 | 2 | 250–1k | +25% | ×1.2 | 130% |
@@ -306,8 +306,11 @@ src/
 
 | Parameter | Value |
 |---|---|
-| Base hop apex | 9 studs |
+| Base rise speed | 42 studs/s |
+| Base fall speed | 55 studs/s (scales up with LegPower) |
 | Max jump time | 2.0s (refills instantly on landing) |
+| LegPower speed bonus | +0.05% per press, uncapped |
+| LegPower tick interval | 0.15s while holding |
 | LegPower jump bonus | scales continuously, no cap |
 | Charge Bonus per loop / cap | +5% / +50% |
 | Double-jump height multiplier | ×0.8 |
@@ -334,7 +337,8 @@ src/
 ## 14. MVP Scope & Milestone Roadmap
 
 ### MVP (prove the core fun)
-- [x] Continuous hold-to-jump with a jump-time meter (fall when empty, recharge on ground)
+- [x] Continuous hold-to-jump with a jump-time meter (smooth rise, fall when empty, instant refill on landing)
+- [x] Jump & fall speed scale with LegPower (faster the thicker your legs)
 - [x] LegPower growth (account-permanent) + leg/body girth visual, persisted via DataStore (in-memory fallback)
 - [x] Height tracking → Leap Coins payout (new-height-only)
 - [x] HUD (height / best / LegPower / coins) + jump-time bar
