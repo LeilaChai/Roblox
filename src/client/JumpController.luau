@@ -160,9 +160,11 @@ function JumpController.start()
 		local rising = holding and not spent and heightGained < maxJumpHeight
 
 		if rising then
-			-- Rise fast toward your jump height. The bar drains with height gained
-			-- and hits empty exactly at the peak.
-			hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseSpeed, move.Z)
+			-- Rise toward your jump height, but cap THIS frame's speed so we stop
+			-- exactly at maxJumpHeight — no momentum overshoot past it.
+			local remaining = maxJumpHeight - heightGained
+			local riseThisFrame = math.min(riseSpeed, remaining / math.max(dt, 1e-4))
+			hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseThisFrame, move.Z)
 			barFraction = 1 - heightGained / maxJumpHeight
 
 			if not grounded then
@@ -172,15 +174,15 @@ function JumpController.start()
 				end
 			end
 		else
-			-- Peak reached (or released): commit to falling until we land again.
+			-- Released, or peak/bar reached: FALL IMMEDIATELY. Kill any leftover
+			-- upward momentum so you drop the instant you stop rising.
 			if holding and not grounded then
 				spent = true
 			end
 			barFraction = grounded and 1 or 0
 
-			-- Thicker legs fall faster: enforce a LegPower-scaled minimum fall speed,
-			-- while still letting you steer horizontally on the way down.
-			if not grounded and velocity.Y < 0 then
+			-- Thicker legs fall faster (and we steer horizontally on the way down).
+			if not grounded then
 				local vy = math.min(velocity.Y, -fallSpeed)
 				hrp.AssemblyLinearVelocity = Vector3.new(move.X, vy, move.Z)
 			end

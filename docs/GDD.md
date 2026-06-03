@@ -60,7 +60,7 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 ### 4.1 Jump: height + speed (hold to rise & hover) — implemented (M1)
 
 **Design** — jump **height** and jump **speed** are separate stats, both growing with LegPower:
-- **Hold Space to jump up.** You rise fast to your **jump height** (how far above the platform you left), and **the instant you reach the peak you fall** — no hover/float. Hold through the landing to jump again, bouncing up the tower.
+- **Hold Space to jump up.** You rise to **exactly** your **jump height** (no momentum overshoot past it), and you **fall immediately** the instant you stop rising — whether that's because you **released Space** or the **bar/peak was reached**. No hover/float. Hold through the landing to jump again, bouncing up the tower.
 - The **progress bar tracks the jump arc itself**: it starts full at launch, drains as you rise, and is **empty exactly at the climax** (the peak). So the bar always matches your jump height — a low jump empties it quickly, a high jump takes longer.
 - **Holding Space grows LegPower the whole time it's held** (every 0.15s counts as a press). More/longer pressing → higher & faster jumps **and** thicker legs. This runs in every phase (rise, peak, fall), so quick jumps still accrue presses.
 - **Jump height starts LOW** — `6 studs`, below Roblox's default `7.2` — and grows with LegPower. So a fresh player is weak; the higher you can jump, the bigger the gaps you can clear.
