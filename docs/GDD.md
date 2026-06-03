@@ -57,33 +57,35 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 
 ## 4. Core Mechanics in Detail
 
-### 4.1 Jump: height + speed (hold to rise & hover) — implemented (M1)
+### 4.1 Jump: time-based (hold to rise) — implemented (M1)
 
-**Design** — jump **height** and jump **speed** are separate stats, both growing with LegPower:
-- **Hold Space to jump up.** You rise fast to your **jump height** (how far above the platform you left), and **the instant you reach the peak you fall** — no hover/float. Hold through the landing to jump again, bouncing up the tower.
-- The **progress bar tracks the jump arc itself**: it starts full at launch, drains as you rise, and is **empty exactly at the climax** (the peak). So the bar always matches your jump height — a low jump empties it quickly, a high jump takes longer.
-- **Holding Space grows LegPower the whole time it's held** (every 0.15s counts as a press). More/longer pressing → higher & faster jumps **and** thicker legs. This runs in every phase (rise, peak, fall), so quick jumps still accrue presses.
-- **Jump height starts LOW** — `6 studs`, below Roblox's default `7.2` — and grows with LegPower. So a fresh player is weak; the higher you can jump, the bigger the gaps you can clear.
-- **Rise & fall speed are separate and fast**, and also scale with LegPower: the higher you can jump, the faster you rise to that height and the faster you fall back down.
+**Design** — the jump is governed by **jump time** (how long the rise lasts), which is matched to the initial jump height and grows with LegPower:
+- **Hold Space to jump up.** You rise at `RiseSpeed` for `JumpTime` seconds, then **the instant the time is up (the peak) you fall** — no hover/float. Hold through the landing to jump again, bouncing up the tower.
+- **Jump time is derived to match the initial jump height**: a fresh jump rises for exactly long enough to reach `BASE_JUMP_HEIGHT` (5 studs, below Roblox's `7.2` default), so a new player can only jump that high.
+- **The more you press, the longer (and higher) the jump.** Holding grows account-permanent LegPower (every 0.15s = a press), which **increases jump time** — so jumps get longer in duration *and* reach higher. Rise/fall speed also scale with LegPower on top of this.
+- The **progress bar tracks the jump itself**: full at launch, drains over the jump time, and **empty exactly at the peak**. Longer jumps (more LegPower) drain it over a longer time.
+- **Holding also thickens your legs** (LegPower tier) and speeds up rising/falling — the same stat drives everything.
 - **Full air control**: horizontal movement follows your input (`MoveDirection × Air Move Speed`) every frame — steer while rising or falling.
 - **No animation glitch**: the Humanoid `Jumping` state is disabled (airborne uses a stable Freefall pose), girth only updates on LegPower **tier** change, and a `MAX_VERTICAL_SPEED` clamp prevents tunneling through platforms.
 
 ```
-JumpHeight = BaseJumpHeight × (1 + LegPowerHeightBonus) × (1 + ChargeBonus)   ← how high (starts < default)
-RiseSpeed  = BaseRiseSpeed  × (1 + LegPowerSpeedBonus)  × (1 + ChargeBonus)   ← how fast up
-FallSpeed  = BaseFallSpeed  × (1 + LegPowerSpeedBonus)                        ← how fast down (thicker = faster)
+JumpTime  = (BaseJumpHeight ÷ BaseRiseSpeed) × (1 + LegPowerJumpTimeBonus) × (1 + ChargeBonus)   ← initial time matches the initial height; grows with presses (capped by MAX_JUMP_TIME)
+RiseSpeed = BaseRiseSpeed × (1 + LegPowerSpeedBonus) × (1 + ChargeBonus)
+FallSpeed = BaseFallSpeed × (1 + LegPowerSpeedBonus)
+JumpHeight ≈ RiseSpeed × JumpTime    ← emergent; equals BaseJumpHeight at LegPower 0
 ```
 
 | Parameter | Initial value | Notes |
 |---|---|---|
-| Base jump height | 6 studs | Above the launch platform, at LegPower 0 (< 7.2 default) |
-| LegPower height bonus | +0.2% per press | +200% jump height at 1000 presses |
+| Initial jump height | 5 studs | A fresh jump rises exactly this high (< 7.2 default) |
+| Jump time (initial) | ≈ height ÷ rise speed | Derived so the first jump matches the initial height |
+| LegPower jump-time bonus | +1% per press | Longer & higher jumps the more you press; capped |
+| Max jump time | 1.5s | Cap on a single jump's rise duration |
 | Base rise speed | 120 studs/s | Snappy; scales with LegPower |
 | Base fall speed | 90 studs/s | Scales with LegPower (thicker = faster) |
 | LegPower speed bonus | +0.4% per press, uncapped | +100% at 250 presses, +400% at 1000 |
 | Max vertical speed | 240 studs/s | Safety clamp (prevents platform tunneling) |
 | Air move speed | 18 studs/s | Horizontal steering while airborne |
-| Max airborne time | 2.0s | Safety only (stop rising if blocked under a ledge) |
 | LegPower tick interval | 0.15s | How often holding counts as a press |
 
 ### 4.2 LegPower (Leg Muscle) — prototype exists, now account-permanent
@@ -316,15 +318,15 @@ src/
 
 | Parameter | Value |
 |---|---|
-| Base jump height | 6 studs (< 7.2 default), +0.2%/press |
+| Initial jump height | 5 studs (< 7.2 default); jump time derived to match |
+| LegPower jump-time bonus | +1% per press (longer & higher jumps), capped |
+| Max jump time | 1.5s (cap on rise duration) |
 | Base rise speed | 120 studs/s (scales with LegPower) |
 | Base fall speed | 90 studs/s (scales with LegPower) |
 | Max vertical speed | 240 studs/s (anti-tunneling clamp) |
 | Air move speed | 18 studs/s |
-| Max airborne time | 2.0s (safety only; jump ends at the peak) |
 | LegPower speed bonus | +0.4% per press, uncapped (+100% @250, +400% @1000) |
 | LegPower tick interval | 0.15s while holding |
-| LegPower jump bonus | scales continuously, no cap |
 | Charge Bonus per loop / cap | +5% / +50% |
 | Double-jump height multiplier | ×0.8 |
 | Stomp invuln frame / stun | 0.3s / 0.5s |
