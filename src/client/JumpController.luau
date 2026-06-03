@@ -20,8 +20,9 @@ local ACTION_NAME = "LeapJump"
 
 local holding = false
 local spent = false   -- reached the peak of the current jump; falling until we land
-local jumpElapsed = 0 -- seconds elapsed in the current jump's rise (0 = just launched)
+local airTime = 0     -- safety: how long we've been rising (prevents sticking under a ledge)
 local tickAccum = 0   -- accumulates time to space out LegPower "presses"
+local lastGroundY = 0 -- Y of the platform we last stood on (jump-height reference)
 local barFraction = 1 -- 1 = full (ready / just launched), 0 = at the peak (true value)
 local displayedFraction = 1 -- smoothed value shown on the bar (drains slowly)
 local knockedUntil = 0 -- os.clock() until which we're stomped (jump input ignored)
@@ -137,39 +138,39 @@ function JumpController.start()
 		if grounded then
 			-- Touch down -> ready to jump again immediately (bar full).
 			spent = false
-			jumpElapsed = 0
+			airTime = 0
+			lastGroundY = hrp.Position.Y -- launch reference for the jump-height cap
 		end
 
+		-- LegPower (account-permanent) + ChargeBonus (run-scoped) drive both how
+		-- HIGH you can jump and how FAST you rise/fall.
 		local legPower = (player:GetAttribute("LegPower") :: number?) or 0
 		local chargeBonus = (player:GetAttribute("ChargeBonus") :: number?) or 0
 		local speedMult = (1 + legPower * Config.LEGPOWER_SPEED_BONUS_PER_PRESS) * (1 + chargeBonus)
+		local heightMult = (1 + legPower * Config.LEGPOWER_HEIGHT_BONUS_PER_PRESS) * (1 + chargeBonus)
 
-		-- JUMP TIME governs the jump: derived so a fresh jump rises exactly
-		-- BASE_JUMP_HEIGHT, then GROWS with LegPower (more presses = longer & higher
-		-- jump), capped by MAX_JUMP_TIME.
-		local baseJumpTime = Config.BASE_JUMP_HEIGHT / Config.JUMP_RISE_SPEED
-		local jumpTime = math.min(
-			baseJumpTime * (1 + legPower * Config.LEGPOWER_JUMPTIME_BONUS_PER_PRESS) * (1 + chargeBonus),
-			Config.MAX_JUMP_TIME
-		)
-
+		local maxJumpHeight = Config.BASE_JUMP_HEIGHT * heightMult
 		local riseSpeed = math.min(Config.JUMP_RISE_SPEED * speedMult, Config.MAX_VERTICAL_SPEED)
 		local fallSpeed = math.min(Config.BASE_FALL_SPEED * speedMult, Config.MAX_VERTICAL_SPEED)
 
 		-- Horizontal steering from movement input, so you can move while jumping.
 		local move = humanoid.MoveDirection * Config.AIR_MOVE_SPEED
 		local velocity = hrp.AssemblyLinearVelocity
-		local rising = holding and not spent and jumpElapsed < jumpTime
+		local heightGained = hrp.Position.Y - lastGroundY
+		local rising = holding and not spent and heightGained < maxJumpHeight
 
 		if rising then
-			-- Rise at riseSpeed for up to jumpTime seconds. The bar drains with
-			-- elapsed time and is empty exactly at the peak (when the time is up).
+			-- Rise fast toward your jump height. The bar drains with height gained
+			-- and hits empty exactly at the peak.
 			hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseSpeed, move.Z)
-			jumpElapsed += dt
-			if jumpElapsed >= jumpTime then
-				spent = true
+			barFraction = 1 - heightGained / maxJumpHeight
+
+			if not grounded then
+				airTime += dt
+				if airTime > Config.MAX_JUMP_TIME then
+					spent = true -- safety: blocked under a ledge, stop trying to rise
+				end
 			end
-			barFraction = 1 - jumpElapsed / jumpTime
 		else
 			-- Peak reached (or released): commit to falling until we land again.
 			if holding and not grounded then
