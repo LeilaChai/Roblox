@@ -8,7 +8,7 @@ local Config = {}
 -- JUMP HEIGHT: how high a single jump lifts you above the platform you left.
 -- Starts LOWER than Roblox's default (~7.2) and grows with LegPower. You rise to
 -- this height fast, then HOVER there (steering) until your jump time runs out.
-Config.BASE_JUMP_HEIGHT = 6                   -- studs above launch platform at LegPower 0 (< 7.2 default)
+Config.BASE_JUMP_HEIGHT = 5                   -- studs above launch platform at LegPower 0 (< 7.2 default)
 Config.LEGPOWER_HEIGHT_BONUS_PER_PRESS = 0.002 -- +200% jump height at 1000 presses
 
 -- SPEED: how fast you rise to your jump height and how fast you fall. Both scale
