@@ -18,18 +18,29 @@ local function girthFor(legPower: number): number
 	return math.clamp(1 + legPower * Config.GIRTH_PER_PRESS, 1, Config.GIRTH_MAX_SCALE)
 end
 
+-- The leg parts we balloon. R15 first, R6 names as a fallback.
+local LEG_PARTS = {
+	"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+	"RightUpperLeg", "RightLowerLeg", "RightFoot",
+	"Left Leg", "Right Leg",
+}
+
+-- Thicken ONLY the leg parts: scale their X/Z (girth) but keep Y (length) so
+-- the hip/knee joints stay vertically aligned and the legs don't detach.
 local function setScale(character: Model, scale: number)
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then
-		return
-	end
-	local width = humanoid:FindFirstChild("BodyWidthScale")
-	local depth = humanoid:FindFirstChild("BodyDepthScale")
-	if width and width:IsA("NumberValue") then
-		width.Value = scale
-	end
-	if depth and depth:IsA("NumberValue") then
-		depth.Value = scale
+	for _, name in ipairs(LEG_PARTS) do
+		local part = character:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			local origAttr = part:GetAttribute("LeapOrigSize")
+			local orig: Vector3
+			if typeof(origAttr) == "Vector3" then
+				orig = origAttr :: Vector3
+			else
+				orig = part.Size
+				part:SetAttribute("LeapOrigSize", orig) -- remember the original once
+			end
+			part.Size = Vector3.new(orig.X * scale, orig.Y, orig.Z * scale)
+		end
 	end
 end
 

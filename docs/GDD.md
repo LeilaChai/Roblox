@@ -93,7 +93,7 @@ FallSpeed  = BaseFallSpeed × (1 + LegPowerSpeedBonus)        ← how fast down 
 **Target design**:
 - **`LegPower`** is a server-authoritative, **account-permanent** stat saved via DataStore. Every spacebar press increments it; it **never resets**. The longer a player plays, the thicker their legs.
 - LegPower drives:
-  1. **Visual**: leg/body girth thickens **continuously** with LegPower (`girth = 1 + LegPower × 0.02`, capped ×3), re-applied only when it moves enough to avoid rig jitter.
+  1. **Visual**: the **leg parts** thicken **continuously** with LegPower (`girth = 1 + LegPower × 0.02`, capped ×3) — only the legs' X/Z scale, length kept so joints stay aligned. Re-applied only when it moves enough to avoid rig jitter.
   2. **Jump & fall speed**: higher LegPower → faster rising *and* faster falling (and thus higher reach), scaling **continuously with no cap** — long-term players keep getting stronger.
   3. **Stomp resolution**: decides stomp outcome when other players are present (see 4.3).
   4. **Fall cost (the counter)**: thicker legs fall faster and have a **lower fall-damage threshold**. Big legs stay genuinely risky near death zones. *(Confirmed kept.)*
