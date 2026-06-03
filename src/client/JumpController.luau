@@ -162,9 +162,10 @@ function JumpController.start()
 		local legPower = (player:GetAttribute("LegPower") :: number?) or 0
 		local chargeBonus = (player:GetAttribute("ChargeBonus") :: number?) or 0
 		local speedMult = (1 + legPower * Config.LEGPOWER_SPEED_BONUS_PER_PRESS) * (1 + chargeBonus)
-		local heightMult = (1 + legPower * Config.LEGPOWER_HEIGHT_BONUS_PER_PRESS) * (1 + chargeBonus)
 
-		local maxJumpHeight = Config.BASE_JUMP_HEIGHT * heightMult
+		-- Jump height = (number of jumps) × base. Each press adds BASE_JUMP_HEIGHT
+		-- studs; the first jump (LegPower 1, or 0 before it replicates) is base.
+		local maxJumpHeight = math.max(1, legPower) * Config.BASE_JUMP_HEIGHT
 		local riseSpeed = math.min(Config.JUMP_RISE_SPEED * speedMult, Config.MAX_VERTICAL_SPEED)
 		local fallSpeed = math.min(Config.BASE_FALL_SPEED * speedMult, Config.MAX_VERTICAL_SPEED)
 

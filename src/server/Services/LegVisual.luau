@@ -12,18 +12,10 @@ local Profile = require(script.Parent:WaitForChild("Profile"))
 
 local LegVisual = {}
 
-local lastTier: { [Player]: number } = {}
+local lastScale: { [Player]: number } = {}
 
-local function tierFor(legPower: number): number
-	local tier = 1
-	local thresholds = Config.LEGPOWER_TIER_PRESSES
-	for i = #thresholds, 1, -1 do
-		if legPower >= thresholds[i] then
-			tier = i
-			break
-		end
-	end
-	return tier
+local function girthFor(legPower: number): number
+	return math.clamp(1 + legPower * Config.GIRTH_PER_PRESS, 1, Config.GIRTH_MAX_SCALE)
 end
 
 local function setScale(character: Model, scale: number)
@@ -41,26 +33,28 @@ local function setScale(character: Model, scale: number)
 	end
 end
 
--- Call freely (e.g. on every jump). It only touches the rig when the tier moves.
+-- Call freely (e.g. on every jump). It only re-stamps the rig once the girth
+-- has moved by GIRTH_UPDATE_STEP (avoids a per-frame rig re-fit / jitter).
 function LegVisual.apply(player: Player, character: Model?)
 	if not character then
 		return
 	end
-	local tier = tierFor(Profile.get(player, "legPower"))
-	if lastTier[player] == tier then
+	local scale = girthFor(Profile.get(player, "legPower"))
+	local prev = lastScale[player]
+	if prev and math.abs(scale - prev) < Config.GIRTH_UPDATE_STEP and scale < Config.GIRTH_MAX_SCALE then
 		return
 	end
-	lastTier[player] = tier
-	setScale(character, Config.LEGPOWER_TIER_GIRTH[tier] or 1)
+	lastScale[player] = scale
+	setScale(character, scale)
 end
 
 -- Reset cache so the next apply re-stamps the scale onto a fresh character.
 function LegVisual.onNewCharacter(player: Player)
-	lastTier[player] = nil
+	lastScale[player] = nil
 end
 
 function LegVisual.clear(player: Player)
-	lastTier[player] = nil
+	lastScale[player] = nil
 end
 
 return LegVisual

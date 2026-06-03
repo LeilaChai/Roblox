@@ -69,21 +69,21 @@ There is **no win condition** — the goal is maximum height. Sessions are open-
 - **No animation glitch**: the Humanoid `Jumping` state is disabled (airborne uses a stable Freefall pose), girth only updates on LegPower **tier** change, and a `MAX_VERTICAL_SPEED` clamp prevents tunneling through platforms.
 
 ```
-JumpHeight = BaseJumpHeight × (1 + LegPowerHeightBonus) × (1 + ChargeBonus)   ← how high (starts < default)
-RiseSpeed  = BaseRiseSpeed  × (1 + LegPowerSpeedBonus)  × (1 + ChargeBonus)   ← how fast up
-FallSpeed  = BaseFallSpeed  × (1 + LegPowerSpeedBonus)                        ← how fast down (thicker = faster)
+JumpHeight = LegPower (number of jumps) × BaseJumpHeight     ← +BaseJumpHeight studs per press
+RiseSpeed  = BaseRiseSpeed × (1 + LegPowerSpeedBonus)        ← how fast up
+FallSpeed  = BaseFallSpeed × (1 + LegPowerSpeedBonus)        ← how fast down (thicker = faster)
 ```
 
 | Parameter | Initial value | Notes |
 |---|---|---|
-| Base jump height | 5 studs | Above the launch platform, at LegPower 0 (< 7.2 default) |
-| LegPower height bonus | +60% per jump | grows extremely fast (+3 studs per jump) |
+| Base jump height | 5 studs | Added **per jump**; the first jump is 5 (< 7.2 default) |
+| Jump height formula | LegPower × 5 | 1 jump → 5, 10 jumps → 50, 100 → 500 studs |
 | Base rise speed | 120 studs/s | Snappy; scales with LegPower |
 | Base fall speed | 90 studs/s | Scales with LegPower (thicker = faster) |
 | LegPower speed bonus | +0.4% per press, uncapped | +100% at 250 presses, +400% at 1000 |
 | Max vertical speed | 240 studs/s | Safety clamp (prevents platform tunneling) |
 | Air move speed | 18 studs/s | Horizontal steering while airborne |
-| Max airborne time | 2.0s | Safety only (stop rising if blocked under a ledge) |
+| Max airborne time | 25s | Safety only (lets very tall jumps finish their rise) |
 | LegPower per jump | +1 press | One jump = one press (grows account-permanent LegPower) |
 
 ### 4.2 LegPower (Leg Muscle) — prototype exists, now account-permanent
@@ -93,7 +93,7 @@ FallSpeed  = BaseFallSpeed  × (1 + LegPowerSpeedBonus)                        �
 **Target design**:
 - **`LegPower`** is a server-authoritative, **account-permanent** stat saved via DataStore. Every spacebar press increments it; it **never resets**. The longer a player plays, the thicker their legs.
 - LegPower drives:
-  1. **Visual**: leg mesh/scale thickens by tier (`UpdateMuscle`).
+  1. **Visual**: leg/body girth thickens **continuously** with LegPower (`girth = 1 + LegPower × 0.02`, capped ×3), re-applied only when it moves enough to avoid rig jitter.
   2. **Jump & fall speed**: higher LegPower → faster rising *and* faster falling (and thus higher reach), scaling **continuously with no cap** — long-term players keep getting stronger.
   3. **Stomp resolution**: decides stomp outcome when other players are present (see 4.3).
   4. **Fall cost (the counter)**: thicker legs fall faster and have a **lower fall-damage threshold**. Big legs stay genuinely risky near death zones. *(Confirmed kept.)*
