@@ -9,7 +9,7 @@ local Config = {}
 -- Starts LOWER than Roblox's default (~7.2) and grows with LegPower. You rise to
 -- this height fast, then HOVER there (steering) until your jump time runs out.
 Config.BASE_JUMP_HEIGHT = 5                   -- studs above launch platform at LegPower 0 (< 7.2 default)
-Config.LEGPOWER_HEIGHT_BONUS_PER_PRESS = 0.005 -- +0.5% jump height per jump (+500% at 1000 jumps)
+Config.LEGPOWER_HEIGHT_BONUS_PER_PRESS = 0.008 -- +0.8% jump height per jump (+800% at 1000 jumps)
 
 -- SPEED: how fast you rise to your jump height and how fast you fall. Both scale
 -- hard with LegPower, so the higher you can jump, the faster you reach/leave it.

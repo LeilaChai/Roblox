@@ -77,7 +77,7 @@ FallSpeed  = BaseFallSpeed  Ã— (1 + LegPowerSpeedBonus)                        â
 | Parameter | Initial value | Notes |
 |---|---|---|
 | Base jump height | 5 studs | Above the launch platform, at LegPower 0 (< 7.2 default) |
-| LegPower height bonus | +0.5% per jump | +500% jump height at 1000 jumps |
+| LegPower height bonus | +0.8% per jump | +800% jump height at 1000 jumps |
 | Base rise speed | 120 studs/s | Snappy; scales with LegPower |
 | Base fall speed | 90 studs/s | Scales with LegPower (thicker = faster) |
 | LegPower speed bonus | +0.4% per press, uncapped | +100% at 250 presses, +400% at 1000 |
