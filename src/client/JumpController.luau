@@ -19,6 +19,8 @@ local JumpController = {}
 local ACTION_NAME = "LeapJump"
 
 local holding = false
+local jumpQueued = false -- a fresh Space press waiting to start a jump
+local jumpActive = false -- a jump is in progress (launched from a press, not yet landed)
 local spent = false   -- reached the peak of the current jump; falling until we land
 local airTime = 0     -- safety: how long we've been rising (prevents sticking under a ledge)
 local tickAccum = 0   -- accumulates time to space out LegPower "presses"
@@ -109,6 +111,7 @@ function JumpController.start()
 	ContextActionService:BindAction(ACTION_NAME, function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
 			holding = true
+			jumpQueued = true -- fresh press: arm exactly one jump
 		elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
 			holding = false
 		end
@@ -136,10 +139,20 @@ function JumpController.start()
 
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		if grounded then
-			-- Touch down -> ready to jump again immediately (bar full).
+			-- Touch down: end the jump and refresh the bar. A HELD key will NOT
+			-- start a new jump — you must release and press Space again.
 			spent = false
 			airTime = 0
 			lastGroundY = hrp.Position.Y -- launch reference for the jump-height cap
+			jumpActive = false
+		end
+
+		-- A jump starts only from a FRESH press (edge), while grounded.
+		if not holding then
+			jumpQueued = false -- released: drop any stale queued press
+		elseif grounded and jumpQueued then
+			jumpActive = true
+			jumpQueued = false -- consume the press (no auto-rejump while held)
 		end
 
 		-- LegPower (account-permanent) + ChargeBonus (run-scoped) drive both how
@@ -157,7 +170,7 @@ function JumpController.start()
 		local move = humanoid.MoveDirection * Config.AIR_MOVE_SPEED
 		local velocity = hrp.AssemblyLinearVelocity
 		local heightGained = hrp.Position.Y - lastGroundY
-		local rising = holding and not spent and heightGained < maxJumpHeight
+		local rising = jumpActive and holding and not spent and heightGained < maxJumpHeight
 
 		if rising then
 			-- Rise toward your jump height, but cap THIS frame's speed so we stop
@@ -176,7 +189,7 @@ function JumpController.start()
 		else
 			-- Released, or peak/bar reached: FALL IMMEDIATELY. Kill any leftover
 			-- upward momentum so you drop the instant you stop rising.
-			if holding and not grounded then
+			if jumpActive and not grounded then
 				spent = true
 			end
 			barFraction = grounded and 1 or 0
