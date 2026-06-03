@@ -23,7 +23,6 @@ local jumpQueued = false -- a fresh Space press waiting to start a jump
 local jumpActive = false -- a jump is in progress (launched from a press, not yet landed)
 local spent = false   -- reached the peak of the current jump; falling until we land
 local airTime = 0     -- safety: how long we've been rising (prevents sticking under a ledge)
-local tickAccum = 0   -- accumulates time to space out LegPower "presses"
 local lastGroundY = 0 -- Y of the platform we last stood on (jump-height reference)
 local barFraction = 1 -- 1 = full (ready / just launched), 0 = at the peak (true value)
 local displayedFraction = 1 -- smoothed value shown on the bar (drains slowly)
@@ -153,6 +152,9 @@ function JumpController.start()
 		elseif grounded and jumpQueued then
 			jumpActive = true
 			jumpQueued = false -- consume the press (no auto-rejump while held)
+			-- One jump = one "press": grow account-permanent LegPower (higher/faster
+			-- jumps + thicker legs). Server is authoritative.
+			Remotes.RequestJump:FireServer(1)
 		end
 
 		-- LegPower (account-permanent) + ChargeBonus (run-scoped) drive both how
@@ -199,19 +201,6 @@ function JumpController.start()
 				local vy = math.min(velocity.Y, -fallSpeed)
 				hrp.AssemblyLinearVelocity = Vector3.new(move.X, vy, move.Z)
 			end
-		end
-
-		-- Holding Space = "pressing" the jump: grow account-permanent LegPower the
-		-- whole time it's held (any phase), so the more/longer you press, the higher
-		-- and faster you jump AND the thicker your legs get. Server is authoritative.
-		if holding then
-			tickAccum += dt
-			while tickAccum >= Config.LEGPOWER_TICK_INTERVAL do
-				tickAccum -= Config.LEGPOWER_TICK_INTERVAL
-				Remotes.RequestJump:FireServer(1)
-			end
-		else
-			tickAccum = 0
 		end
 
 		-- Ease the displayed bar toward the true power value: cap how fast it can
