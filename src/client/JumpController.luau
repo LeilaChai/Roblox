@@ -25,6 +25,8 @@ local tickAccum = 0   -- accumulates time to space out LegPower "presses"
 local lastGroundY = 0 -- Y of the platform we last stood on (jump-height reference)
 local barFraction = 1 -- 1 = full (ready / just launched), 0 = at the peak (true value)
 local displayedFraction = 1 -- smoothed value shown on the bar (drains slowly)
+local knockedUntil = 0 -- os.clock() until which we're stomped (jump input ignored)
+local knockSpeed = 0   -- downward speed applied while knocked
 
 local function getCharacter(): (Humanoid?, BasePart?)
 	local character = player.Character
@@ -98,6 +100,12 @@ function JumpController.start()
 
 	buildBar()
 
+	-- M2: got stomped by a stronger-legged player -> get knocked down.
+	Remotes.Stomped.OnClientEvent:Connect(function(pushSpeed: number, stun: number)
+		knockSpeed = pushSpeed
+		knockedUntil = os.clock() + stun
+	end)
+
 	ContextActionService:BindAction(ACTION_NAME, function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
 			holding = true
@@ -113,6 +121,16 @@ function JumpController.start()
 			return
 		end
 		if humanoid.Health <= 0 or humanoid.Sit then
+			return
+		end
+
+		-- M2: while stomped, get driven downward and ignore jump input.
+		if os.clock() < knockedUntil then
+			local v = hrp.AssemblyLinearVelocity
+			hrp.AssemblyLinearVelocity = Vector3.new(v.X, -knockSpeed, v.Z)
+			spent = true -- can't jump out of the knockback
+			displayedFraction = 0
+			updateBar()
 			return
 		end
 

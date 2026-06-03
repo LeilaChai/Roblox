@@ -35,6 +35,15 @@ Config.LEGPOWER_TIER_GIRTH = { 1.0, 1.2, 1.4, 1.6, 1.8 }
 Config.CHARGE_BONUS_PER_LOOP = 0.05
 Config.CHARGE_BONUS_CAP = 0.50
 
+-- ── Stomp (M2): step on a weaker-legged player to push them down ──
+Config.STOMP_CHECK_INTERVAL = 0.1   -- server check cadence (seconds)
+Config.STOMP_RADIUS = 3.5           -- horizontal distance (studs) to count as "on top of" them
+Config.STOMP_MIN_DY = 1.5           -- stomper must be at least this far above the victim
+Config.STOMP_MAX_DY = 6             -- ...and at most this far above
+Config.STOMP_PUSH_SPEED = 130       -- downward speed applied to the stomped victim
+Config.STOMP_STUN = 0.6             -- seconds the victim is knocked down (can't jump)
+Config.STOMP_COOLDOWN = 1.0         -- per-victim cooldown so it can't retrigger every frame
+
 -- ── Economy ─────────────────────────────────────────────────────
 Config.COINS_PER_STUD = 1           -- Leap Coins earned per new stud of height
 

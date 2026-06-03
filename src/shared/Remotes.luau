@@ -38,8 +38,10 @@ local function event(name: string): RemoteEvent
 end
 
 local Remotes = {
-	-- Client -> Server: "I released a charged jump with this charge fraction (0..1)."
+	-- Client -> Server: a jump "press" tick (grows LegPower).
 	RequestJump = event("RequestJump"),
+	-- Server -> Client: you got stomped — get knocked down. (pushSpeed, stunSeconds)
+	Stomped = event("Stomped"),
 }
 
 return Remotes

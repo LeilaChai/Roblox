@@ -13,6 +13,7 @@ local LegPowerService = require(Services:WaitForChild("LegPowerService"))
 local EconomyService = require(Services:WaitForChild("EconomyService"))
 local HeightTracker = require(Services:WaitForChild("HeightTracker"))
 local LegVisual = require(Services:WaitForChild("LegVisual"))
+local StompService = require(Services:WaitForChild("StompService"))
 
 local function onCharacterAdded(player: Player, character: Model)
 	LegVisual.onNewCharacter(player) -- fresh rig spawns at default scale; re-stamp it
@@ -65,5 +66,8 @@ HeightTracker.start({
 		EconomyService.addCoins(player, studsGained * Config.COINS_PER_STUD)
 	end,
 })
+
+-- M2: stomp weaker-legged players down.
+StompService.start()
 
 print("[Leap of Legends] M1 server ready.")

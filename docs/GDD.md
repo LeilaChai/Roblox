@@ -112,6 +112,8 @@ FallSpeed  = BaseFallSpeed  × (1 + LegPowerSpeedBonus)                        �
 
 When other players share the server, stomping adds a competitive layer. With solo play it simply never triggers.
 
+> **Implemented (M2):** the push-down half. The server detects when you're on top of another player (within `STOMP_RADIUS` horizontally, `STOMP_MIN_DY..STOMP_MAX_DY` above, not jumping up into them); if your LegPower is higher, it sends `Stomped` to the victim, who is driven downward for `STOMP_STUN` seconds (jump input ignored). The stomper's **double-jump reward is not wired yet** — see below for the planned full design.
+
 **Trigger**: Player A lands on player B's head hitbox **from above**. The **server** compares `A.LegPower` vs `B.LegPower`.
 
 | Case | For A (stomper) | For B (stomped) |
