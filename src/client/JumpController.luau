@@ -1,8 +1,11 @@
 --!strict
--- Hold SPACE to jump. You rise to your jump height; the progress bar drains as
--- you rise and is EMPTY exactly at the peak — at which point you fall. Holding
--- through a landing immediately jumps again, so you bounce up the tower.
--- Jump height and rise/fall speed both scale with account-permanent LegPower.
+-- Press SPACE to jump, then KEEP HOLDING to keep rising toward your max jump
+-- height; release (or hit the peak) and you fall immediately. The more total
+-- presses you've made, the higher you can go (max height = presses × BASE_JUMP_HEIGHT),
+-- so bigger jumps require holding longer.
+-- NO auto-jump: once you land, a still-held key does nothing — you must RELEASE
+-- and press Space again to start the next jump.
+-- The progress bar drains as you rise and is EMPTY exactly at the peak.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,16 +21,22 @@ local JumpController = {}
 
 local ACTION_NAME = "LeapJump"
 
-local holding = false
+local holding = false  -- is Space currently held? (must hold to keep rising)
 local jumpQueued = false -- a fresh Space press waiting to start a jump
 local jumpActive = false -- a jump is in progress (launched from a press, not yet landed)
 local spent = false   -- reached the peak of the current jump; falling until we land
+local wasGrounded = false -- tracks the air→ground transition to detect a fresh landing
 local airTime = 0     -- safety: how long we've been rising (prevents sticking under a ledge)
 local lastGroundY = 0 -- Y of the platform we last stood on (jump-height reference)
 local barFraction = 1 -- 1 = full (ready / just launched), 0 = at the peak (true value)
 local displayedFraction = 1 -- smoothed value shown on the bar (drains slowly)
 local knockedUntil = 0 -- os.clock() until which we're stomped (jump input ignored)
 local knockSpeed = 0   -- downward speed applied while knocked
+-- Local, immediately-updated count of total spacebar presses. The server's
+-- LegPower is authoritative & persisted, but it replicates back a frame late;
+-- we increment this the instant a jump launches so the CURRENT jump already
+-- reflects the press (jump height = presses × BASE_JUMP_HEIGHT, no lag).
+local presses = 0
 
 local function getCharacter(): (Humanoid?, BasePart?)
 	local character = player.Character
@@ -90,6 +99,9 @@ local function setupCharacter(character: Model)
 	local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
 	if humanoid and humanoid:IsA("Humanoid") then
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+		-- Kill Roblox's automatic obstacle-jump (on by default, esp. on touch) — a
+		-- real source of "auto jump" where the character hops without input.
+		humanoid.AutoJumpEnabled = false
 	end
 end
 
@@ -101,13 +113,30 @@ function JumpController.start()
 
 	buildBar()
 
+	-- Seed the local press count from the server's saved LegPower, and keep it in
+	-- sync as the authoritative value replicates (never go backwards from a late
+	-- update — our local count may legitimately be ahead by the in-flight press).
+	presses = (player:GetAttribute("LegPower") :: number?) or 0
+	player:GetAttributeChangedSignal("LegPower"):Connect(function()
+		local serverValue = (player:GetAttribute("LegPower") :: number?) or 0
+		if serverValue > presses then
+			presses = serverValue
+		end
+	end)
+
 	-- M2: got stomped by a stronger-legged player -> get knocked down.
 	Remotes.Stomped.OnClientEvent:Connect(function(pushSpeed: number, stun: number)
 		knockSpeed = pushSpeed
 		knockedUntil = os.clock() + stun
 	end)
 
-	ContextActionService:BindAction(ACTION_NAME, function(_, inputState)
+	-- Bind Space at HIGH priority so we always sink it ABOVE Roblox's built-in
+	-- jump binding (the default control module also uses ContextActionService; a
+	-- plain BindAction can sit BELOW it and let the default auto-jump through).
+	ContextActionService:BindActionAtPriority(ACTION_NAME, function(_, inputState)
+		-- Begin fires once per physical press: arm a jump on that edge AND mark the
+		-- key as held. Holding keeps you rising; releasing makes you fall. The
+		-- landing-edge guard below stops a held key from auto-starting a new jump.
 		if inputState == Enum.UserInputState.Begin then
 			holding = true
 			jumpQueued = true -- fresh press: arm exactly one jump
@@ -115,7 +144,7 @@ function JumpController.start()
 			holding = false
 		end
 		return Enum.ContextActionResult.Sink -- prevent the default jump
-	end, true, Enum.KeyCode.Space)
+	end, true, Enum.ContextActionPriority.High.Value, Enum.KeyCode.Space)
 
 	RunService.Heartbeat:Connect(function(dt)
 		local humanoid, hrp = getCharacter()
@@ -137,51 +166,70 @@ function JumpController.start()
 		end
 
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
-		if grounded then
-			-- Touch down: end the jump and refresh the bar. A HELD key will NOT
-			-- start a new jump — you must release and press Space again.
+		if grounded and not wasGrounded then
+			-- JUST LANDED: end the jump and clear any press that was buffered while
+			-- airborne. This is what prevents auto-jump — a key still held from the
+			-- previous jump is ignored; you must release and press Space again.
 			spent = false
 			airTime = 0
 			lastGroundY = hrp.Position.Y -- launch reference for the jump-height cap
 			jumpActive = false
+			jumpQueued = false
+		elseif grounded then
+			lastGroundY = hrp.Position.Y -- standing still: keep the launch reference fresh
 		end
+		wasGrounded = grounded
 
-		-- A jump starts only from a FRESH press (edge), while grounded.
-		if not holding then
-			jumpQueued = false -- released: drop any stale queued press
-		elseif grounded and jumpQueued then
+		-- A jump starts ONLY from a fresh Space press (Begin edge) made while
+		-- grounded. jumpQueued is set by the input callback and cleared on landing,
+		-- so holding the key can never trigger a second jump.
+		if grounded and jumpQueued and not jumpActive then
 			jumpActive = true
-			jumpQueued = false -- consume the press (no auto-rejump while held)
+			jumpQueued = false -- consume the press
+			-- Count this press locally RIGHT NOW so the jump we're about to take
+			-- already uses the new height (no waiting for the server to replicate).
+			presses += 1
+			-- TEMP debug: confirm height scales with presses (remove after testing).
+			print(string.format("[Leap] Jump #%d  ->  height = %d studs",
+				presses, presses * Config.BASE_JUMP_HEIGHT))
 			-- One jump = one "press": grow account-permanent LegPower (higher/faster
 			-- jumps + thicker legs). Server is authoritative.
 			Remotes.RequestJump:FireServer(1)
 		end
 
-		-- LegPower (account-permanent) + ChargeBonus (run-scoped) drive both how
-		-- HIGH you can jump and how FAST you rise/fall.
-		local legPower = (player:GetAttribute("LegPower") :: number?) or 0
+		-- Total accumulated presses (account-permanent) + ChargeBonus (run-scoped)
+		-- drive both how HIGH you can jump and how FAST you rise/fall.
 		local chargeBonus = (player:GetAttribute("ChargeBonus") :: number?) or 0
-		local speedMult = (1 + legPower * Config.LEGPOWER_SPEED_BONUS_PER_PRESS) * (1 + chargeBonus)
+		local speedMult = (1 + presses * Config.LEGPOWER_SPEED_BONUS_PER_PRESS) * (1 + chargeBonus)
 
-		-- Jump height = (number of jumps) × base. Each press adds BASE_JUMP_HEIGHT
-		-- studs; the first jump (LegPower 1, or 0 before it replicates) is base.
-		local maxJumpHeight = math.max(1, legPower) * Config.BASE_JUMP_HEIGHT
+		-- Jump height = (number of spacebar presses) × base. Each press adds
+		-- BASE_JUMP_HEIGHT studs and accumulates forever; the first jump is base.
+		local maxJumpHeight = math.max(1, presses) * Config.BASE_JUMP_HEIGHT
 		local riseSpeed = math.min(Config.JUMP_RISE_SPEED * speedMult, Config.MAX_VERTICAL_SPEED)
 		local fallSpeed = math.min(Config.BASE_FALL_SPEED * speedMult, Config.MAX_VERTICAL_SPEED)
 
 		-- Horizontal steering from movement input, so you can move while jumping.
 		local move = humanoid.MoveDirection * Config.AIR_MOVE_SPEED
-		local velocity = hrp.AssemblyLinearVelocity
 		local heightGained = hrp.Position.Y - lastGroundY
+		-- You rise only while STILL HOLDING Space and below your max jump height.
+		-- Release early (or hit the peak) → you stop rising and fall immediately.
+		-- Bigger jump height (more presses) means you must hold longer to reach it.
 		local rising = jumpActive and holding and not spent and heightGained < maxJumpHeight
 
 		if rising then
-			-- Rise toward your jump height, but cap THIS frame's speed so we stop
-			-- exactly at maxJumpHeight — no momentum overshoot past it.
 			local remaining = maxJumpHeight - heightGained
-			local riseThisFrame = math.min(riseSpeed, remaining / math.max(dt, 1e-4))
-			hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseThisFrame, move.Z)
-			barFraction = 1 - heightGained / maxJumpHeight
+			if remaining <= riseSpeed * dt then
+				-- We hit the TOP this frame: stop rising and FALL IMMEDIATELY. No
+				-- easing/deceleration into the apex — the instant you reach your peak
+				-- height you start dropping at full fall speed.
+				spent = true
+				barFraction = 0
+				hrp.AssemblyLinearVelocity = Vector3.new(move.X, -fallSpeed, move.Z)
+			else
+				-- Rise at FULL speed the whole way up (no slow crawl near the top).
+				hrp.AssemblyLinearVelocity = Vector3.new(move.X, riseSpeed, move.Z)
+				barFraction = 1 - heightGained / maxJumpHeight
+			end
 
 			if not grounded then
 				airTime += dt
@@ -190,8 +238,8 @@ function JumpController.start()
 				end
 			end
 		else
-			-- Released, or peak/bar reached: FALL IMMEDIATELY. Kill any leftover
-			-- upward momentum so you drop the instant you stop rising.
+			-- Released, or peak reached: FALL IMMEDIATELY. Force downward velocity so
+			-- there is no leftover upward momentum or hover at the top.
 			if jumpActive and not grounded then
 				spent = true
 			end
@@ -199,8 +247,7 @@ function JumpController.start()
 
 			-- Thicker legs fall faster (and we steer horizontally on the way down).
 			if not grounded then
-				local vy = math.min(velocity.Y, -fallSpeed)
-				hrp.AssemblyLinearVelocity = Vector3.new(move.X, vy, move.Z)
+				hrp.AssemblyLinearVelocity = Vector3.new(move.X, -fallSpeed, move.Z)
 			end
 		end
 

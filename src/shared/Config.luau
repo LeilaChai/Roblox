@@ -8,7 +8,10 @@ local Config = {}
 -- JUMP HEIGHT = (number of jumps / LegPower) × BASE_JUMP_HEIGHT.
 -- Each spacebar press adds BASE_JUMP_HEIGHT studs. The first jump is exactly
 -- BASE_JUMP_HEIGHT (below Roblox's ~7.2 default).
-Config.BASE_JUMP_HEIGHT = 5                   -- studs added per jump (also the first jump's height)
+Config.BASE_JUMP_HEIGHT = 25                  -- studs added per jump (also the first jump's height)
+-- ^ TEMP high value so jump-height growth is obvious while testing:
+--   press 1 → 25 studs, press 2 → 50, press 3 → 75, press 5 → 125, etc.
+--   Tune back down (GDD suggests ~5) once you've confirmed it scales.
 
 -- SPEED: how fast you rise to your jump height and how fast you fall. Both scale
 -- hard with LegPower, so the higher you can jump, the faster you reach/leave it.
