@@ -31,6 +31,10 @@ Based on GDD §14 MVP.
 - [ ] **Death zone + checkpoint respawn** — the old `src/workspace/Floor/DeadZone.server.luau` is just an unwired backup; no checkpoint system.
 - [ ] **Basic Feather wing (3s glide) + Glide Charge consumption (stub purchase)** — not started (the old `PressToFly` prototype was removed).
 
+## 🐞 Bugs (M1)
+
+- [x] **Airborne always showed the FALL animation** — fixed: now plays the JUMP animation while rising and the FALL animation on the way down. (`JumpController` loads the jump anim and plays it during the rise at high priority, overriding the default fall pose.)
+
 ---
 
 ## M2 — Content
@@ -44,6 +48,9 @@ From GDD §14 milestone table (+ §4.3 stomp).
 - [ ] **Zone LegPower gating** (higher zones need more LegPower)
 - [ ] **Checkpoints** (shared with the M1 death-zone item)
 
+### 🐞 Bugs (M2)
+- _(none yet)_
+
 ## M3 — Economy & Wings
 
 - [ ] **Leap Coins sinks** (what coins buy)
@@ -52,6 +59,9 @@ From GDD §14 milestone table (+ §4.3 stomp).
 - [ ] **Temporary boosts** (2× coins / charge, etc.)
 - [ ] **MarketplaceService** (Robux products & game passes)
 
+### 🐞 Bugs (M3)
+- _(none yet)_
+
 ## M4 — Social & Retention
 
 - [ ] **Leaderboards** (live server + global all-time height)
@@ -59,8 +69,14 @@ From GDD §14 milestone table (+ §4.3 stomp).
 - [ ] **Daily quests**
 - [ ] **Stomp PvP polish** (invuln frames, fairness, feedback FX)
 
+### 🐞 Bugs (M4)
+- _(none yet)_
+
 ## M5 — Launch
 
 - [ ] **Robux monetization** (premium wings, jump-power upgrades)
 - [ ] **Launch event**
 - [ ] **Telemetry & iteration**
+
+### 🐞 Bugs (M5)
+- _(none yet)_
