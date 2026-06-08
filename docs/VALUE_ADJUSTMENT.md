@@ -11,10 +11,8 @@ Check an item off (`[x]`) once it's been set to its intended value.
 
 ## To do
 
-- [ ] **`BASE_JUMP_HEIGHT`** — `src/shared/Config.luau`
-  - Current (test): **25** — temporary high value so jump-height growth is obvious while testing (press 1 → 25 studs, press 2 → 50, press 3 → 75 …).
-  - Intended: **~5** (below Roblox's 7.2 default). Tune back down once scaling is confirmed.
+_(none)_
 
 ## Done
 
-_(none yet)_
+- [x] **`BASE_JUMP_HEIGHT`** — `src/shared/Config.luau` — set back to **5** (intended; < 7.2 default) after confirming jump-height scaling. _(was temporarily 25 for testing)_
