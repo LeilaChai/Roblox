@@ -33,7 +33,7 @@ Based on GDD §14 MVP.
 
 ## 🐞 Bugs (M1)
 
-- [x] **Airborne always showed the FALL animation** — fixed: now plays the JUMP animation while rising and the FALL animation on the way down. (`JumpController` loads the jump anim and plays it during the rise at high priority, overriding the default fall pose.)
+- [x] **Airborne animation** — The FALL anim used to show the whole airborne time. A custom looped jump-anim track was tried, but it **glitched on tall jumps** (short clip looping over a long rise). **Final fix:** removed the custom track and switched to **Roblox's default animation system** — leave the Jumping state enabled and trigger `humanoid:ChangeState(Jumping)` on each launch, so the default jump anim plays on launch and the default looping fall anim plays while airborne. Jump *behavior* (velocity-driven height = presses × base) unchanged.
 
 ---
 

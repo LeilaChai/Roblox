@@ -32,7 +32,6 @@ local barFraction = 1 -- 1 = full (ready / just launched), 0 = at the peak (true
 local displayedFraction = 1 -- smoothed value shown on the bar (drains slowly)
 local knockedUntil = 0 -- os.clock() until which we're stomped (jump input ignored)
 local knockSpeed = 0   -- downward speed applied while knocked
-local jumpTrack: AnimationTrack? = nil -- jump animation, played while rising
 -- Local, immediately-updated count of total spacebar presses. The server's
 -- LegPower is authoritative & persisted, but it replicates back a frame late;
 -- we increment this the instant a jump launches so the CURRENT jump already
@@ -101,36 +100,13 @@ local function setupCharacter(character: Model)
 	if not (humanoid and humanoid:IsA("Humanoid")) then
 		return
 	end
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 	-- Kill Roblox's automatic obstacle-jump (on by default, esp. on touch) — a
 	-- real source of "auto jump" where the character hops without input.
 	humanoid.AutoJumpEnabled = false
-
-	-- With the Jumping state disabled, the default Animate script shows the FALL
-	-- pose the WHOLE time you're airborne. To show the JUMP pose while RISING, load
-	-- the jump animation here and play it ourselves during the rise (high priority
-	-- so it overrides the default fall); on the way down we stop it and fall shows.
-	jumpTrack = nil
-	local animator = humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator", 5)
-	if animator and animator:IsA("Animator") then
-		local jumpId = "rbxassetid://616163682" -- R15 default jump (fallback)
-		local animate = character:FindFirstChild("Animate")
-		local jumpFolder = animate and animate:FindFirstChild("jump")
-		local jumpAnim = jumpFolder and jumpFolder:FindFirstChildWhichIsA("Animation")
-		if jumpAnim and jumpAnim.AnimationId ~= "" then
-			jumpId = jumpAnim.AnimationId
-		end
-		local anim = Instance.new("Animation")
-		anim.AnimationId = jumpId
-		local ok, track = pcall(function()
-			return animator:LoadAnimation(anim)
-		end)
-		if ok and track then
-			track.Priority = Enum.AnimationPriority.Action4 -- override the default fall
-			track.Looped = true -- hold the jump pose for the whole rise
-			jumpTrack = track
-		end
-	end
+	-- Leave the Jumping state ENABLED so Roblox drives jump/fall animations the
+	-- DEFAULT way (jump anim on launch, then the looping fall anim while airborne).
+	-- We just nudge the state into Jumping when a jump starts (see launch below);
+	-- our own code still drives the actual movement.
 end
 
 function JumpController.start()
@@ -222,7 +198,8 @@ function JumpController.start()
 				presses, presses * Config.BASE_JUMP_HEIGHT))
 			-- One jump = one "press": grow account-permanent LegPower (higher/faster
 			-- jumps + thicker legs). Server is authoritative.
-			Remotes.RequestJump:FireServer(1)
+			humanoid:ChangeState(Enum.HumanoidStateType.Jumping) -- play Roblox's default jump anim
+				Remotes.RequestJump:FireServer(1)
 		end
 
 		-- Total accumulated presses (account-permanent) + ChargeBonus (run-scoped)
@@ -276,18 +253,6 @@ function JumpController.start()
 			-- Thicker legs fall faster (and we steer horizontally on the way down).
 			if not grounded then
 				hrp.AssemblyLinearVelocity = Vector3.new(move.X, -fallSpeed, move.Z)
-			end
-		end
-
-		-- Animation: show the JUMP pose while RISING; on the way down (and on the
-		-- ground) stop it so the default FALL / idle / walk poses show through.
-		if jumpTrack then
-			if rising and not grounded then
-				if not jumpTrack.IsPlaying then
-					jumpTrack:Play(0.1)
-				end
-			elseif jumpTrack.IsPlaying then
-				jumpTrack:Stop(0.1)
 			end
 		end
 
